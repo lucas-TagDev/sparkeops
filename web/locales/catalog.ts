@@ -1,3 +1,4 @@
+import { publicDashboardRows } from "./public-dashboards.ts";
 import { accountConfirmationRows } from "./account-confirmation.ts";
 import { aiEndpointRows } from "./ai-endpoints.ts";
 import { turnstileRows } from "./turnstile.ts";
@@ -568,7 +569,9 @@ for (const row of (
   "\n" +
   aiEndpointRows +
   "\n" +
-  accountConfirmationRows
+  accountConfirmationRows +
+  "\n" +
+  publicDashboardRows
 )
   .trim()
   .split("\n")) {

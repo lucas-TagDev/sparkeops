@@ -134,3 +134,6 @@ Use **API compatível / Local** nas configurações de IA para conectar LM Studi
 ## Confirmação de novas contas
 
 O administrador geral pode habilitar **Exigir confirmação de e-mail nos novos cadastros** em **Administração da plataforma → E-mails da plataforma**. Requer SMTP habilitado; teste o envio antes de ativar. Novas contas ficam sem sessão até confirmar o link, com validade de 30 minutos e opção de reenvio. Contas existentes não são bloqueadas. Consulte o [guia de e-mails](docs/platform-email.md).
+
+- [Painéis públicos para TV](docs/paineis-publicos.md): publique servidores e URLs selecionados em um link de consulta.
+

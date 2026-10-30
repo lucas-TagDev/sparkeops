@@ -1,3 +1,4 @@
+import { PublicDashboardManager } from "./PublicDashboardManager.tsx";
 import { AccountConfirmationPending } from "./AccountConfirmationPending.tsx";
 import { useCaptcha } from "./TurnstileWidget.tsx";
 import { RecoveryPolicyPanel } from "./RecoveryPolicyPanel.tsx";
@@ -128,7 +129,8 @@ type Page =
   | "team"
   | "billing"
   | "settings"
-  | "platform";
+  | "platform"
+  | "public-dashboards";
 type Enrollment = {
   server_id: string;
   enrollment_token: string;
@@ -139,6 +141,7 @@ const navigation = [
   { id: "overview", title: "Visão geral", icon: LayoutDashboard },
   { id: "servers", title: "Servidores", icon: ServerIcon },
   { id: "urls", title: "Monitoramento de URLs", icon: Globe },
+  { id: "public-dashboards", title: "Painéis públicos", icon: Globe },
   { id: "clients", title: "Clientes", icon: Building2 },
   { id: "alerts", title: "Alertas", icon: Bell },
   { id: "assistant", title: "Assistente", icon: Sparkles },
@@ -490,6 +493,7 @@ export function App() {
                 (n) =>
                   !["team", "billing", "settings", "platform"].includes(n.id),
               )
+              .filter((n) => n.id !== "public-dashboards" || canAdmin)
               .map((n) => (
                 <button
                   key={n.id}
@@ -631,6 +635,9 @@ export function App() {
                           "Um olhar completo sobre a saúde da sua infraestrutura.",
                         ),
                         urls: tx("Acompanhe sites e APIs em um só lugar."),
+                        "public-dashboards": tx(
+                          "Compartilhe o monitoramento em um painel para TV.",
+                        ),
                         servers: tx(
                           "Acompanhe cada servidor. Antecipe o próximo problema.",
                         ),
@@ -853,6 +860,9 @@ export function App() {
                 )}
                 {page === "team" && (
                   <Team {...contentProps} organizations={me.organizations} />
+                )}
+                {page === "public-dashboards" && canAdmin && (
+                  <PublicDashboardManager key={me.account.id} />
                 )}
                 {page === "urls" && (
                   <URLMonitoringPage

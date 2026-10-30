@@ -1,3 +1,4 @@
+import { PublicDashboards } from "./public-dashboards.ts";
 import { Turnstile } from "./turnstile.ts";
 import { StripeSettings } from "./stripe-settings.ts";
 import { ServiceRecovery } from "./service-recovery.ts";
@@ -78,6 +79,11 @@ export function createApp(
     administration,
     options.origin ?? options.billing?.origin ?? "http://localhost:8080",
     options.turnstileFetch,
+  );
+  const publicDashboards = new PublicDashboards(
+    platform,
+    aiSettings,
+    options.origin ?? options.billing?.origin ?? "http://localhost:8080",
   );
   const notifications = new Notifications(platform, aiSettings);
   const operations = new Operations(platform, aiSettings, options.sshExecutor);
@@ -261,6 +267,10 @@ export function createApp(
     "/api/agent/live-checks",
     express.json({ limit: "256kb", strict: false }),
   );
+  app.use(
+    "/api/v1/public-dashboards",
+    express.json({ limit: "192kb", strict: false }),
+  );
   app.use(express.json({ limit: "32kb", strict: false }));
   app.get("/health", (_req, res) => {
     res.json({ status: "ok" });
@@ -272,6 +282,13 @@ export function createApp(
     );
     limit("traces:" + hash(token), 30);
     res.json(observability.ingest(token, body(req)));
+  });
+  app.get("/api/public/dashboard", (req, res) => {
+    limit("public-dashboard-ip:" + req.ip, 120);
+    const token = (req.headers.authorization ?? "").replace(/^Bearer /, "");
+    limit("public-dashboard-token:" + hash(token), 600);
+    res.setHeader("X-Robots-Tag", "noindex, nofollow");
+    res.json(publicDashboards.snapshot(token, req.query));
   });
   app.get("/api/config", (_req, res) => {
     res.json({
@@ -322,12 +339,10 @@ export function createApp(
           error instanceof APIError &&
           error.message === "Confirme seu e-mail para acessar a plataforma."
         ) {
-          res
-            .status(202)
-            .json({
-              verification_required: true,
-              email: String(body(req).email ?? ""),
-            });
+          res.status(202).json({
+            verification_required: true,
+            email: String(body(req).email ?? ""),
+          });
           return;
         }
         throw error;
@@ -630,6 +645,24 @@ export function createApp(
     runbooks.reject(p(res), String(req.params.id), String(req.params.run));
     res.json({ ok: true });
   });
+  app.get("/api/v1/public-dashboards", (_req, res) =>
+    res.json(publicDashboards.list(p(res))),
+  );
+  app.get("/api/v1/public-dashboards/options", (_req, res) =>
+    res.json(publicDashboards.options(p(res))),
+  );
+  app.post("/api/v1/public-dashboards", (req, res) =>
+    res.status(201).json(publicDashboards.save(p(res), undefined, body(req))),
+  );
+  app.put("/api/v1/public-dashboards/:id", (req, res) =>
+    res.json(publicDashboards.save(p(res), String(req.params.id), body(req))),
+  );
+  app.post("/api/v1/public-dashboards/:id/rotate", (req, res) =>
+    res.json(publicDashboards.rotate(p(res), String(req.params.id))),
+  );
+  app.delete("/api/v1/public-dashboards/:id", (req, res) =>
+    res.json(publicDashboards.remove(p(res), String(req.params.id))),
+  );
   app.get("/api/v1/platform/ai/endpoints", (_req, res) => {
     administration.authorize(p(res));
     res.json({ origins: aiSettings.endpoints.origins() });
@@ -1351,6 +1384,11 @@ export function createApp(
   app.get("/agent/runbook_runner.py", (_req, res) =>
     res.sendFile(resolve("agent/runbook_runner.py")),
   );
+  app.get("/status", (_req, res) => {
+    res.setHeader("X-Robots-Tag", "noindex, nofollow");
+    res.setHeader("Cache-Control", "no-store");
+    res.sendFile(resolve(root, "dist/index.html"));
+  });
   app.use(express.static(resolve(root, "dist"), { index: "index.html" }));
   app.use((req, res) => {
     if (req.path !== "/" || req.method !== "GET")

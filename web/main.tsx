@@ -1,3 +1,4 @@
+import { PublicDashboard } from "./PublicDashboard.tsx";
 import React, { useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App.tsx";
@@ -19,7 +20,7 @@ function LocalizedApp() {
   return (
     <>
       <LanguagePicker />
-      <App />
+      {location.pathname === "/status" ? <PublicDashboard /> : <App />}
       <ConfirmDialog />
     </>
   );

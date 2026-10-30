@@ -71,6 +71,12 @@ export class AISettings {
     if (!existsSync(path) && create) {
       if (
         (this.platform.store.db
+          .prepare("SELECT 1 FROM sqlite_master WHERE name='public_dashboards'")
+          .get() &&
+          this.platform.store.db
+            .prepare("SELECT 1 FROM public_dashboards LIMIT 1")
+            .get()) ||
+        (this.platform.store.db
           .prepare(
             "SELECT 1 FROM sqlite_master WHERE name='turnstile_settings'",
           )
