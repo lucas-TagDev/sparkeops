@@ -298,13 +298,45 @@ export function createApp(
         body(req).captcha_token,
         req.ip,
       );
-      const result = platform[method](body(req));
-      if (method === "signup") {
-        try {
-          platformEmail.accountNotice(result.principal.userId, "welcome");
-        } catch {
-          console.error("NÃ£o foi possÃ­vel preparar o e-mail de boas-vindas.");
+      const afterCreate = (principal: Principal) => {
+        if (platform.pendingAccountConfirmation(principal.userId))
+          platformEmail.queueAccountConfirmation(principal.userId);
+        else if (method === "signup") {
+          try {
+            platformEmail.accountNotice(principal.userId, "welcome");
+          } catch {
+            console.error("Falha ao preparar boas-vindas.");
+          }
         }
+      };
+      let result;
+      try {
+        result =
+          method === "signup"
+            ? platform.signup(body(req), afterCreate)
+            : method === "acceptInvite"
+              ? platform.acceptInvite(body(req), afterCreate)
+              : platform.login(body(req));
+      } catch (error) {
+        if (
+          error instanceof APIError &&
+          error.message === "Confirme seu e-mail para acessar a plataforma."
+        ) {
+          res
+            .status(202)
+            .json({
+              verification_required: true,
+              email: String(body(req).email ?? ""),
+            });
+          return;
+        }
+        throw error;
+      }
+      if (!result.token) {
+        res
+          .status(202)
+          .json({ verification_required: true, email: result.principal.email });
+        return;
       }
       setCookie(req, res, result.token);
       res
@@ -329,6 +361,24 @@ export function createApp(
   app.post("/api/auth/confirm-email", (req, res) => {
     limit("confirm-email:" + req.ip, 10, 900);
     res.json(platformEmail.confirmEmail(body(req).token));
+  });
+  app.get("/api/auth/account-policy", (_req, res) =>
+    res.json({ confirmation_required: platform.accountConfirmationRequired() }),
+  );
+  app.post("/api/auth/resend-confirmation", async (req, res) => {
+    limit("account-confirm-ip:" + req.ip, 5, 900);
+    limit(
+      "account-confirm-email:" +
+        hash(String(body(req).email).trim().toLowerCase()),
+      3,
+      900,
+    );
+    await turnstile.verify("signup", body(req).captcha_token, req.ip);
+    res.json(platformEmail.resendAccountConfirmation(body(req).email));
+  });
+  app.post("/api/auth/confirm-account", (req, res) => {
+    limit("confirm-account:" + req.ip, 10, 900);
+    res.json(platformEmail.confirmAccount(body(req).token));
   });
   app.get("/api/auth/captcha", (_req, res) =>
     res.json(turnstile.publicSettings()),

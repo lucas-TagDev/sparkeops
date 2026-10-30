@@ -1,3 +1,4 @@
+import { accountConfirmationRows } from "./account-confirmation.ts";
 import { aiEndpointRows } from "./ai-endpoints.ts";
 import { turnstileRows } from "./turnstile.ts";
 import { settingsRows } from "./settings.ts";
@@ -565,7 +566,9 @@ for (const row of (
   "\n" +
   turnstileRows +
   "\n" +
-  aiEndpointRows
+  aiEndpointRows +
+  "\n" +
+  accountConfirmationRows
 )
   .trim()
   .split("\n")) {

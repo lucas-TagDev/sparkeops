@@ -24,3 +24,16 @@ Verificação automatizada usa SMTP simulado e não envia mensagens reais. A ent
 Em **Configurações → Alterar minha senha**, qualquer usuário autenticado pode informar a senha atual, uma nova senha de 12 a 128 caracteres e sua confirmação. A nova senha deve ser diferente da anterior. A operação funciona sem SMTP; quando habilitado, o e-mail envia um aviso sem incluir a senha.
 
 As sessões antigas, tokens MCP e links de recuperação pendentes são invalidados. O navegador que solicitou a alteração recebe uma nova sessão e continua conectado. A ação fica registrada na auditoria como `user.password.changed`.
+
+
+## Confirmação obrigatória de conta (opcional)
+
+Em **Administração da plataforma → E-mails da plataforma**, o administrador geral pode marcar **Exigir confirmação de e-mail nos novos cadastros**. A opção vem desligada. Habilite e teste primeiro o SMTP e configure PUBLIC_URL com o endereço público correto.
+
+Enquanto habilitada, novos cadastros e novas contas criadas por convite recebem um link de confirmação com validade de 30 minutos. O cadastro não cria sessão autenticada e o login não é liberado antes da confirmação. O link abre uma tela com um botão de confirmação: apenas abrir a URL por GET não ativa a conta, para evitar ativação por scanners de e-mail.
+
+A tela de entrada oferece reenvio com resposta genérica, limites por IP/e-mail e CAPTCHA de cadastro quando configurado. Reenviar invalida links anteriores. Os tokens são de uso único, vinculados ao e-mail e à senha atuais e armazenados somente como hash; o e-mail na fila é criptografado. Trocar a senha invalida um link antigo: solicite outro na tela de entrada.
+
+Contas existentes não são bloqueadas ao ativar a opção. Desabilitar a exigência permite login às contas pendentes; reabilitar volta a exigir a confirmação das contas que ficaram pendentes. Contas desativadas por um administrador não podem ser reativadas pelo link. Os clientes não podem alterar essa política global.
+
+O SMTP não pode ser desabilitado enquanto a exigência estiver ligada. O envio é assíncrono; acompanhe a fila e teste a entrega real. Os testes automatizados usam um remetente simulado.

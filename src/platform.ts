@@ -116,6 +116,8 @@ export class Platform {
       CREATE TABLE IF NOT EXISTS organizations(id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL REFERENCES tenants(id), name TEXT NOT NULL, created_at INTEGER NOT NULL);
       CREATE TABLE IF NOT EXISTS grants(user_id TEXT NOT NULL, organization TEXT NOT NULL REFERENCES organizations(id), PRIMARY KEY(user_id,organization));
       CREATE TABLE IF NOT EXISTS sessions(token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL, tenant_id TEXT NOT NULL, expires_at INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS account_registration_policy(id INTEGER PRIMARY KEY CHECK(id=1),require_confirmation INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS user_email_verification(user_id TEXT PRIMARY KEY,email TEXT NOT NULL,verified_at INTEGER);
       CREATE TABLE IF NOT EXISTS enrollments(token_hash TEXT PRIMARY KEY, server_id TEXT NOT NULL REFERENCES servers(id), expires_at INTEGER NOT NULL, used_at INTEGER);
       CREATE TABLE IF NOT EXISTS server_config(server_id TEXT PRIMARY KEY REFERENCES servers(id), created_at INTEGER NOT NULL, enabled INTEGER NOT NULL DEFAULT 1,
         cpu REAL NOT NULL DEFAULT 85, memory REAL NOT NULL DEFAULT 90, disk REAL NOT NULL DEFAULT 90,
@@ -218,7 +220,24 @@ export class Platform {
       );
   }
 
-  signup(data: Record<string, unknown>) {
+  accountConfirmationRequired() {
+    return !!this.store.db
+      .prepare(
+        "SELECT require_confirmation FROM account_registration_policy WHERE id=1",
+      )
+      .get()?.require_confirmation;
+  }
+  pendingAccountConfirmation(userId: string) {
+    return (
+      this.accountConfirmationRequired() &&
+      !!this.store.db
+        .prepare(
+          "SELECT 1 FROM user_email_verification v JOIN users u ON u.id=v.user_id WHERE v.user_id=? AND v.email=u.email AND v.verified_at IS NULL",
+        )
+        .get(userId)
+    );
+  }
+  signup(data: Record<string, unknown>, afterCreate?: (p: Principal) => void) {
     const name = text(data.name, "Nome");
     const company = text(data.company, "Empresa");
     const email = emailAddress(data.email);
@@ -255,7 +274,14 @@ export class Platform {
         role: "owner",
       };
       this.audit(principal, "account.created");
-      return this.newSession(principal);
+      if (this.accountConfirmationRequired())
+        this.store.db
+          .prepare("INSERT INTO user_email_verification VALUES(?,?,NULL)")
+          .run(userId, email);
+      afterCreate?.(principal);
+      return this.pendingAccountConfirmation(userId)
+        ? { token: "", principal }
+        : this.newSession(principal);
     });
   }
 
@@ -315,6 +341,8 @@ export class Platform {
       .get(userId, tenantId) as
       { name: string; email: string; role: Role } | undefined;
     if (!row) throw new APIError(401, "Acesso expirado. Faça login novamente.");
+    if (this.pendingAccountConfirmation(userId))
+      throw new APIError(403, "Confirme seu e-mail para acessar a plataforma.");
     const pref = this.store.db
       .prepare("SELECT language FROM user_preferences WHERE user_id=?")
       .get(userId);
@@ -1054,7 +1082,10 @@ export class Platform {
     return { token, expires_at: now() + 86400 };
   }
 
-  acceptInvite(data: Record<string, unknown>) {
+  acceptInvite(
+    data: Record<string, unknown>,
+    afterCreate?: (p: Principal) => void,
+  ) {
     const token = text(data.token, "Convite", 128);
     const invite = this.store.db
       .prepare(
@@ -1107,13 +1138,21 @@ export class Platform {
       this.store.db
         .prepare("UPDATE invites SET used_at=? WHERE id=?")
         .run(now(), invite.id);
-      return this.newSession({
+      const principal: Principal = {
         userId,
         tenantId: invite.tenant_id,
         name,
         email: invite.email,
         role: invite.role,
-      });
+      };
+      if (!existing && this.accountConfirmationRequired())
+        this.store.db
+          .prepare("INSERT INTO user_email_verification VALUES(?,?,NULL)")
+          .run(userId, invite.email);
+      afterCreate?.(principal);
+      return this.pendingAccountConfirmation(userId)
+        ? { token: "", principal }
+        : this.newSession(principal);
     });
   }
 

@@ -129,3 +129,8 @@ No Linux, execute `sudo bash deploy/uninstall.sh` para remover programa e servi�
 ## Modelos locais e APIs compatíveis
 
 Use **API compatível / Local** nas configurações de IA para conectar LM Studio e serviços compatíveis com Chat Completions. O administrador geral autoriza o destino em **Endpoints de IA**; o proprietário informa URL base, modelo e chave opcional. Veja o [guia de LLM local](docs/llm-local.md).
+
+
+## Confirmação de novas contas
+
+O administrador geral pode habilitar **Exigir confirmação de e-mail nos novos cadastros** em **Administração da plataforma → E-mails da plataforma**. Requer SMTP habilitado; teste o envio antes de ativar. Novas contas ficam sem sessão até confirmar o link, com validade de 30 minutos e opção de reenvio. Contas existentes não são bloqueadas. Consulte o [guia de e-mails](docs/platform-email.md).

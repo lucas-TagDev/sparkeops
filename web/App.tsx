@@ -1,3 +1,4 @@
+import { AccountConfirmationPending } from "./AccountConfirmationPending.tsx";
 import { useCaptcha } from "./TurnstileWidget.tsx";
 import { RecoveryPolicyPanel } from "./RecoveryPolicyPanel.tsx";
 import {
@@ -395,12 +396,25 @@ export function App() {
     }
   };
   const accountLink = new URLSearchParams(location.hash.slice(1));
-  if (accountLink.has("reset") || accountLink.has("confirm-email"))
+  if (
+    accountLink.has("reset") ||
+    accountLink.has("confirm-email") ||
+    accountLink.has("confirm-account")
+  )
     return (
       <AccountRecovery
-        kind={accountLink.has("reset") ? "reset" : "confirm-email"}
+        kind={
+          accountLink.has("reset")
+            ? "reset"
+            : accountLink.has("confirm-account")
+              ? "confirm-account"
+              : "confirm-email"
+        }
         token={
-          accountLink.get("reset") ?? accountLink.get("confirm-email") ?? ""
+          accountLink.get("reset") ??
+          accountLink.get("confirm-email") ??
+          accountLink.get("confirm-account") ??
+          ""
         }
         onBack={() => {
           history.replaceState(null, "", "/");
@@ -1021,6 +1035,13 @@ export function App() {
 }
 
 function Auth({ onSuccess }: { onSuccess: () => Promise<void> }) {
+  const [pendingEmail, setPendingEmail] = useState<string | null>(null),
+    [confirmationEnabled, setConfirmationEnabled] = useState(false);
+  useEffect(() => {
+    void api<{ confirmation_required: boolean }>("/api/auth/account-policy")
+      .then((result) => setConfirmationEnabled(result.confirmation_required))
+      .catch(() => {});
+  }, []);
   const [forgot, setForgot] = useState(false);
   const branding = useBranding();
   const invite = new URLSearchParams(location.hash.slice(1)).get("invite");
@@ -1030,6 +1051,16 @@ function Auth({ onSuccess }: { onSuccess: () => Promise<void> }) {
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
   const captcha = useCaptcha(invite ? "signup" : mode);
+  if (pendingEmail !== null)
+    return (
+      <AccountConfirmationPending
+        email={pendingEmail}
+        onBack={() => {
+          setPendingEmail(null);
+          setMode("login");
+        }}
+      />
+    );
   if (forgot)
     return <AccountRecovery kind="forgot" onBack={() => setForgot(false)} />;
   return (
@@ -1103,14 +1134,19 @@ function Auth({ onSuccess }: { onSuccess: () => Promise<void> }) {
               setBusy(true);
               const data = Object.fromEntries(new FormData(e.currentTarget));
               try {
-                await api(
-                  invite ? "/api/auth/accept-invite" : `/api/auth/${mode}`,
-                  {
-                    ...data,
-                    ...(invite ? { token: invite } : {}),
-                    captcha_token: captcha.token,
-                  },
-                );
+                const result = await api<{
+                  verification_required?: boolean;
+                  email?: string;
+                }>(invite ? "/api/auth/accept-invite" : `/api/auth/${mode}`, {
+                  ...data,
+                  ...(invite ? { token: invite } : {}),
+                  captcha_token: captcha.token,
+                });
+                if (result.verification_required) {
+                  if (invite) history.replaceState(null, "", "/");
+                  setPendingEmail(result.email ?? String(data.email ?? ""));
+                  return;
+                }
                 if (invite) history.replaceState(null, "", "/");
                 await onSuccess();
               } catch (e) {
@@ -1206,6 +1242,13 @@ function Auth({ onSuccess }: { onSuccess: () => Promise<void> }) {
               </button>
             )}
           </form>
+          {confirmationEnabled && (
+            <p className="auth-switch">
+              <button type="button" onClick={() => setPendingEmail("")}>
+                {tx("Reenviar confirmação de conta")}
+              </button>
+            </p>
+          )}
           {!invite && (
             <p className="auth-switch">
               {mode === "login"

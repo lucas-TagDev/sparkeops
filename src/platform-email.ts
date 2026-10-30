@@ -84,6 +84,7 @@ export class PlatformEmail {
             has_password: false,
           }),
       origin: this.origin,
+      require_account_confirmation: this.platform.accountConfirmationRequired(),
       delivery,
     };
   }
@@ -116,12 +117,29 @@ export class PlatformEmail {
         400,
         "Configuração de e-mail inválida. Use SMTP nas portas 465 ou 587.",
       );
+    const requireConfirmation =
+      d.require_account_confirmation === undefined
+        ? this.platform.accountConfirmationRequired()
+        : d.require_account_confirmation;
+    if (
+      typeof requireConfirmation !== "boolean" ||
+      (requireConfirmation && !c.enabled)
+    )
+      throw new APIError(
+        400,
+        "Habilite o SMTP antes de exigir confirmação de conta.",
+      );
     this.platform.transaction(() => {
       this.platform.store.db
         .prepare(
           "INSERT INTO platform_email_config VALUES (1,?) ON CONFLICT(id) DO UPDATE SET value=excluded.value",
         )
         .run(this.vault.protect("platform", "email-config", JSON.stringify(c)));
+      this.platform.store.db
+        .prepare(
+          "INSERT INTO account_registration_policy VALUES(1,?) ON CONFLICT(id) DO UPDATE SET require_confirmation=excluded.require_confirmation",
+        )
+        .run(requireConfirmation ? 1 : 0);
       this.platform.audit(p, "platform.email.updated");
     });
     return this.settings(p);
@@ -226,6 +244,76 @@ export class PlatformEmail {
             this.origin
           : "Um administrador redefiniu a senha da sua conta. As sessões anteriores foram encerradas. Se você não reconhece esta alteração, procure o administrador da plataforma.",
     });
+  }
+  queueAccountConfirmation(userId: string) {
+    if (!this.platform.pendingAccountConfirmation(userId)) return;
+    if (!this.config()?.enabled)
+      throw new APIError(
+        503,
+        "Envio de confirmação indisponível. Contate o administrador.",
+      );
+    const user = this.platform.store.db
+      .prepare(
+        "SELECT id,email,password_hash FROM users WHERE id=? AND NOT EXISTS(SELECT 1 FROM user_access WHERE user_id=users.id AND disabled=1)",
+      )
+      .get(userId) as
+      { id: string; email: string; password_hash: string } | undefined;
+    if (!user) return;
+    const token = this.createToken(user, "account");
+    this.enqueue(
+      {
+        to: user.email,
+        subject: this.branding.public().name + " — confirme sua conta",
+        text:
+          "Confirme seu e-mail para ativar o acesso à plataforma. O link é válido por 30 minutos e pode ser usado uma única vez.\n\n" +
+          this.origin +
+          "/#confirm-account=" +
+          token,
+      },
+      now() + 1800,
+    );
+  }
+  resendAccountConfirmation(value: unknown) {
+    const email = emailAddress(value);
+    const result = {
+      ok: true,
+      message:
+        "Se houver uma conta aguardando confirmação, enviaremos um novo link.",
+    };
+    if (!this.platform.accountConfirmationRequired()) return result;
+    if (!this.config()?.enabled)
+      throw new APIError(
+        503,
+        "Envio de confirmação indisponível. Contate o administrador.",
+      );
+    const user = this.platform.store.db
+      .prepare("SELECT id FROM users WHERE email=?")
+      .get(email);
+    if (user)
+      this.platform.transaction(() =>
+        this.queueAccountConfirmation(String(user.id)),
+      );
+    return result;
+  }
+  confirmAccount(token: unknown) {
+    this.platform.transaction(() => {
+      const row = this.consume(token, "account"),
+        id = String(row.user_id);
+      const result = this.platform.store.db
+        .prepare(
+          "UPDATE user_email_verification SET verified_at=? WHERE user_id=? AND email=? AND verified_at IS NULL",
+        )
+        .run(now(), id, String(row.email));
+      if (!result.changes)
+        throw new APIError(
+          400,
+          "Link inválido ou expirado. Solicite um novo link.",
+        );
+      this.revoke(id);
+      this.auditUser(id, "user.account.confirmed");
+      this.accountNotice(id, "welcome");
+    });
+    return { ok: true };
   }
   forgot(value: unknown) {
     const email = emailAddress(value);
@@ -410,6 +498,11 @@ export class PlatformEmail {
       this.platform.store.db
         .prepare("UPDATE users SET email=? WHERE id=?")
         .run(String(row.new_email), id);
+      this.platform.store.db
+        .prepare(
+          "UPDATE user_email_verification SET email=?,verified_at=? WHERE user_id=?",
+        )
+        .run(String(row.new_email), now(), id);
       this.revoke(id);
       this.auditUser(id, "user.email.changed");
       this.enqueue({

@@ -9,6 +9,7 @@ type Settings = {
   user: string;
   from: string;
   has_password: boolean;
+  require_account_confirmation: boolean;
   origin: string;
   delivery?: { pending: number; failed: number; last_sent_at: number | null };
 };
@@ -74,6 +75,24 @@ export function PlatformEmailPanel() {
             />{" "}
             {t("Habilitar envio de e-mails da plataforma")}
           </label>
+          <label className="plan-enabled">
+            <input
+              type="checkbox"
+              checked={!!data.require_account_confirmation}
+              onChange={(e) =>
+                setData({
+                  ...data,
+                  require_account_confirmation: e.target.checked,
+                })
+              }
+            />
+            {t("Exigir confirmação de e-mail nos novos cadastros")}
+          </label>
+          <p className="muted">
+            {t(
+              "Com a opção habilitada, novas contas precisam confirmar o e-mail antes de entrar. Contas existentes não são bloqueadas. Configure e teste o SMTP antes de habilitar.",
+            )}
+          </p>
           <div className="platform-admin-form">
             <label>
               {t("Servidor SMTP")}
@@ -227,7 +246,7 @@ export function AccountRecovery({
   token,
   onBack,
 }: {
-  kind: "forgot" | "reset" | "confirm-email";
+  kind: "forgot" | "reset" | "confirm-email" | "confirm-account";
   token?: string;
   onBack: () => void;
 }) {
@@ -235,7 +254,7 @@ export function AccountRecovery({
     [message, setMessage] = useState(""),
     [busy, setBusy] = useState(false);
   const captcha = useCaptcha(
-    kind === "confirm-email"
+    kind === "confirm-email" || kind === "confirm-account"
       ? null
       : kind === "forgot"
         ? "forgot_password"
@@ -250,7 +269,9 @@ export function AccountRecovery({
               ? "Recuperar senha"
               : kind === "reset"
                 ? "Definir nova senha"
-                : "Confirmar novo e-mail",
+                : kind === "confirm-account"
+                  ? "Confirmar minha conta"
+                  : "Confirmar novo e-mail",
           )}
         </h2>
         {error && (
@@ -282,7 +303,9 @@ export function AccountRecovery({
                       ? "forgot-password"
                       : kind === "reset"
                         ? "reset-password"
-                        : "confirm-email"),
+                        : kind === "confirm-account"
+                          ? "confirm-account"
+                          : "confirm-email"),
                   { ...data, token, captcha_token: captcha.token },
                 );
                 setMessage(
@@ -291,7 +314,9 @@ export function AccountRecovery({
                       ? "Se houver uma conta ativa para este e-mail, enviaremos as instruções de recuperação."
                       : kind === "reset"
                         ? "Senha redefinida. Entre com sua nova senha."
-                        : "E-mail confirmado. Entre com seu novo endereço.",
+                        : kind === "confirm-account"
+                          ? "Conta confirmada. Entre com seu e-mail e senha."
+                          : "E-mail confirmado. Entre com seu novo endereço.",
                   ),
                 );
                 if (kind !== "forgot") history.replaceState(null, "", "/");
@@ -340,8 +365,10 @@ export function AccountRecovery({
             )}
             <p className="muted">
               {t(
-                kind === "confirm-email"
-                  ? "Confirme para concluir a alteração do endereço da sua conta."
+                kind === "confirm-email" || kind === "confirm-account"
+                  ? kind === "confirm-account"
+                    ? "Confirme para ativar o acesso à sua conta."
+                    : "Confirme para concluir a alteração do endereço da sua conta."
                   : "O link é válido por 30 minutos e pode ser usado uma única vez.",
               )}
             </p>
@@ -354,7 +381,9 @@ export function AccountRecovery({
                     ? "Enviar instruções"
                     : kind === "reset"
                       ? "Salvar nova senha"
-                      : "Confirmar e-mail",
+                      : kind === "confirm-account"
+                        ? "Confirmar minha conta"
+                        : "Confirmar e-mail",
               )}
             </button>
           </form>
