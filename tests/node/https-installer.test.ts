@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { existsSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import {
+  existsSync,
+  mkdtempSync,
+  mkdirSync,
+  writeFileSync,
+  rmSync,
+} from "node:fs";
 import { resolve, join } from "node:path";
 import { tmpdir } from "node:os";
 import { createHash } from "node:crypto";
@@ -117,5 +123,64 @@ test(
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }
+  },
+);
+
+test(
+  "First install never treats a missing or incomplete current directory as a previous release",
+  { skip: !bash },
+  () => {
+    const directory = mkdtempSync(join(tmpdir(), "sparkeops-state-"));
+    const stateHelper = resolve("deploy/platform-state.sh").replaceAll(
+      "\\",
+      "/",
+    );
+    const current = join(directory, "current");
+    const detect = () =>
+      execFileSync(
+        bash!,
+        [
+          "-c",
+          '. "$1"; platform_previous_release "$2"',
+          "_",
+          stateHelper,
+          current.replaceAll("\\", "/"),
+        ],
+        { encoding: "utf8" },
+      ).trim();
+    try {
+      assert.equal(detect(), "");
+      mkdirSync(current);
+      assert.equal(detect(), "");
+      mkdirSync(join(current, "src"));
+      writeFileSync(join(current, "src/server.ts"), "// previous release");
+      assert.match(detect(), /current$/);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  },
+);
+test(
+  "Service stop skips missing units and preserves real failures for installed units",
+  { skip: !bash },
+  () => {
+    const stateHelper = resolve("deploy/platform-state.sh").replaceAll(
+      "\\",
+      "/",
+    );
+    const script =
+      '. "$1"; systemctl() { if [[ "$1" == show ]]; then printf "%s\\n" "$STATE"; else printf "STOP"; return "$STOP_CODE"; fi; }; platform_stop_if_loaded foxops.service';
+    const run = (state: string, code: string) =>
+      spawnSync(bash!, ["-c", script, "_", stateHelper], {
+        encoding: "utf8",
+        env: { ...process.env, STATE: state, STOP_CODE: code },
+      });
+    const missing = run("not-found", "0");
+    assert.equal(missing.status, 0);
+    assert.equal(missing.stdout, "");
+    const loaded = run("loaded", "0");
+    assert.equal(loaded.status, 0);
+    assert.equal(loaded.stdout, "STOP");
+    assert.equal(run("loaded", "5").status, 5);
   },
 );

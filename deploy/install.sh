@@ -63,14 +63,17 @@ KERNEL=$(uname -r | cut -d- -f1)
 printf 'Sistema: %s; arquitetura: %s; glibc: %s\n' "${PRETTY_NAME:-$ID}" "$ARCH" "$LIBC"
 ((CHECK == 0)) || { printf 'Pré-verificação concluída. Nenhuma alteração realizada.\n'; exit 0; }
 ((EUID == 0)) || fail 'Execute com sudo ou como root.'
-[[ -f "$SOURCE/package-lock.json" && -f "$SOURCE/src/server.ts" ]] || fail 'Extraia o pacote completo antes de executar.'
+[[ -f "$SOURCE/package-lock.json" && -f "$SOURCE/src/server.ts" && -f "$SOURCE/deploy/platform-state.sh" ]] || fail 'Extraia o pacote completo antes de executar.'
+. "$SOURCE/deploy/platform-state.sh"
 command -v flock >/dev/null || fail 'Instale util-linux (flock) antes de continuar.'
 exec 9>/run/foxops-install.lock
 flock -n 9 || fail 'Outra instalação está em execução.'
 for path in "$BASE" "$BASE/releases" "$BASE/runtime" "$BASE/current" "$DATA" /etc/foxops "$ENV_FILE" "$UNIT" /var/backups/foxops /var/cache/foxops; do
   [[ ! -L "$path" || "$path" == "$BASE/current" ]] || fail "Caminho não pode ser link simbólico: $path"
 done
+HAD_CONFIG=0
 if [[ -f "$ENV_FILE" ]]; then
+  HAD_CONFIG=1
   [[ -z "$PUBLIC_URL" && -z "$ADMIN_EMAIL" && "$LOCAL" == 0 && "$PORT" == 8080 ]] || fail 'Atualização preserva a configuração existente. Edite /etc/foxops/foxops.env para alterar o endereço ou administrador.'
   printf 'Atualização: configurações e credenciais existentes serão preservadas.\n'
 else
@@ -116,13 +119,13 @@ install -d -m 0750 -o foxops -g foxops "$DATA" /var/cache/foxops
 install -d -m 0750 -o root -g foxops /etc/foxops
 TEMP=$(mktemp -d /tmp/foxops-platform.XXXXXXXX)
 chmod 0755 "$TEMP"
-PREVIOUS=$(readlink -f "$BASE/current" 2>/dev/null || true)
+PREVIOUS=$(platform_previous_release "$BASE/current")
 STOPPED=0 SWITCHED=0 SUCCESS=0
 cleanup() {
   code=$?
   if ((SUCCESS == 0 && STOPPED)); then
     if ((HTTPS_REQUIRED)); then https_restore || true; fi
-    systemctl stop foxops || true
+    platform_stop_if_loaded foxops.service || true
     if ((SWITCHED)) && [[ -n "$PREVIOUS" && -d "$PREVIOUS" && -f "$TEMP/previous.service" ]]; then
       ln -sfn "$PREVIOUS" "$BASE/current.restore"
       mv -Tf "$BASE/current.restore" "$BASE/current"
@@ -131,7 +134,7 @@ cleanup() {
       install -m 0644 "$TEMP/previous.service" "$UNIT"
       systemctl daemon-reload
     fi
-    if [[ -n "$PREVIOUS" ]]; then systemctl start foxops || true; fi
+    if [[ -n "$PREVIOUS" ]] && platform_unit_loaded foxops.service; then systemctl start foxops || true; fi
     printf 'Instalação não concluída. Verifique journalctl -u foxops. Backup preservado em /var/backups/foxops.\n' >&2
   fi
   # TEMP vem exclusivamente de mktemp com prefixo fixo.
@@ -139,7 +142,10 @@ cleanup() {
   exit "$code"
 }
 trap cleanup EXIT
+PHASE="preparação do HTTPS"
+trap 'printf "ERRO: falha na etapa %s (linha %s, código %s).\n" "$PHASE" "$LINENO" "$?" >&2' ERR
 if ((HTTPS_REQUIRED)); then https_prepare; fi
+PHASE="instalação do Node.js"
 NODE_HOME="$BASE/runtime/node-v$NODE_VERSION-linux-$ARCH"
 if [[ ! -x "$NODE_HOME/bin/node" ]]; then
   FILE="node-v$NODE_VERSION-linux-$ARCH.tar.xz"
@@ -152,6 +158,7 @@ if [[ ! -x "$NODE_HOME/bin/node" ]]; then
 fi
 "$NODE_HOME/bin/node" --input-type=module -e 'import {DatabaseSync} from "node:sqlite"; const d=new DatabaseSync(":memory:"); d.close(); console.log("Node e SQLite disponíveis.")'
 export PATH="$NODE_HOME/bin:$PATH"
+PHASE="compilação da plataforma"
 RELEASE="$BASE/releases/$(date -u +%Y%m%dT%H%M%SZ)-$$"
 install -d -m 0755 "$RELEASE"
 for item in src shared web agent deploy scripts package.json package-lock.json tsconfig.json vite.config.ts index.html; do
@@ -179,8 +186,9 @@ ENV
   chmod 0600 "$ENV_FILE"
 fi
 if [[ -f "$UNIT" ]]; then cp "$UNIT" "$TEMP/previous.service"; fi
-if [[ -n "$PREVIOUS" ]]; then
-  systemctl stop foxops
+PHASE="backup da instalação anterior"
+if [[ -n "$PREVIOUS" || -f "$DATA/foxops.sqlite3" || "$HAD_CONFIG" == 1 ]]; then
+  platform_stop_if_loaded foxops.service
   STOPPED=1
   BACKUP="/var/backups/foxops/pre-upgrade-$(date -u +%Y%m%dT%H%M%SZ)-$$.tar.gz"
   # Inclui banco, eventuais WALs, arquivo mestre e configuração. Nunca distribua este backup com o instalador.
@@ -192,6 +200,7 @@ if [[ -n "$PREVIOUS" ]]; then
   chmod 0600 "$BACKUP"
   printf 'Backup: %s\n' "$BACKUP"
 fi
+PHASE="configuração do serviço da plataforma"
 cat > "$UNIT" <<UNIT
 [Unit]
 Description=SparkeOPS Linux Monitoring Platform
@@ -236,6 +245,7 @@ for ((i=0;i<30;i++)); do
   sleep 1
 done
 ((healthy)) || fail 'Aplicação não respondeu à verificação de saúde.'
+PHASE="emissão e validação do certificado HTTPS"
 if ((HTTPS_REQUIRED)); then
   CERT_EMAIL=$(sed -n 's/^FOXOPS_PLATFORM_ADMIN_EMAILS=//p' "$ENV_FILE" | tail -n1)
   https_activate "$HEALTH_PORT" "${CERT_EMAIL%%,*}"
