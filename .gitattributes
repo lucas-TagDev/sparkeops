@@ -1,0 +1,4 @@
+
+*.sh text eol=lf
+
+agent/*.py text eol=lf

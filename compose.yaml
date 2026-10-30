@@ -1,0 +1,16 @@
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8080
+      NODE_ENV: production
+      FOXOPS_DATABASE: /data/foxops.sqlite3
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - foxops-data:/data
+volumes:
+  foxops-data:

@@ -1,0 +1,93 @@
+# Instalação da plataforma no Linux
+
+Este instalador instala o painel, a API, o banco SQLite e os workers. O agente de monitoramento é instalado separadamente nos servidores, pelo comando apresentado no painel.
+
+## Compatibilidade
+
+O instalador identifica Debian/Ubuntu (apt), RHEL/Rocky/AlmaLinux/Fedora (dnf) e openSUSE (zypper). Requer systemd em execução, kernel 4.18+, glibc 2.28+, arquitetura x86_64 ou ARM64, acesso à internet, root/sudo e util-linux/flock. Não suporta Alpine/musl, sistemas 32 bits ou distribuições antigas sem esses requisitos.
+
+Alvos recomendados para homologação: Ubuntu 22.04/24.04, Debian 12/13 e Rocky/AlmaLinux 9/10. A detecção e os testes locais do instalador não substituem um teste real em cada distribuição. Reserve pelo menos 2 GB de RAM e espaço para dependências, builds e backups; o consumo de dados aumenta com o uso.
+
+O Node 24.22.2 é instalado de forma isolada em `/opt/foxops/runtime`, sem substituir o Node do sistema. O arquivo vem do domínio oficial nodejs.org e seu SHA-256 é conferido com o manifesto oficial. O aplicativo roda como usuário `foxops`, sem privilégios de root.
+
+## Gerar e transferir o pacote
+
+Na máquina do projeto:
+
+```powershell
+npm run package:linux
+scp releases/foxops-platform-0.1.0.tar.gz releases/foxops-platform-0.1.0.tar.gz.sha256 root@IP_DO_LINUX:/tmp/
+```
+
+O pacote exporta somente arquivos da aplicação. Não inclui `.env`, banco de clientes, chaves, node_modules nem backups da instalação atual. Uma instalação em outra máquina começa vazia; transferir os dados exige uma migração separada.
+
+No Linux:
+
+```bash
+cd /tmp
+sha256sum -c foxops-platform-0.1.0.tar.gz.sha256
+tar -xzf foxops-platform-0.1.0.tar.gz
+cd foxops-platform-0.1.0
+bash deploy/install.sh --check
+```
+
+## Teste na rede local
+
+Substitua o IP pelo endereço do Linux que hospedará a plataforma:
+
+```bash
+sudo bash deploy/install.sh --local \
+  --public-url http://192.168.3.180:8080 \
+  --admin-email administrador@suaempresa.com
+```
+
+Abra a URL e cadastre a conta com o mesmo e-mail informado para receber acesso à Administração da plataforma. Não existe senha padrão. Este modo usa HTTP e é destinado a testes em rede confiável; use HTTPS para a implantação pública. Se houver firewall, libere explicitamente a porta configurada para os clientes desejados. O instalador não altera regras de firewall.
+
+## Produção com domínio HTTPS
+
+```bash
+sudo bash deploy/install.sh \
+  --public-url https://monitor.suaempresa.com \
+  --admin-email administrador@suaempresa.com
+```
+
+Nesse modo a aplicação escuta somente em `127.0.0.1:8080`. Configure o DNS e um proxy HTTPS no mesmo servidor; o instalador não instala nem substitui o proxy existente e não emite certificados. Exemplo de configuração para um Caddy já instalado:
+
+```caddyfile
+monitor.suaempresa.com {
+  reverse_proxy 127.0.0.1:8080
+}
+```
+
+O proxy precisa aceitar WebSocket para o terminal SSH. Para certificados públicos, domínio, DNS e portas 80/443 precisam estar configurados adequadamente. Não exponha a porta interna diretamente nesse modo. O endereço HTTPS precisa funcionar para webhooks de pagamento e links enviados por e-mail.
+
+## Administração e operação
+
+```bash
+sudo systemctl status foxops
+sudo systemctl restart foxops
+sudo journalctl -u foxops -f
+```
+
+- Programa e versões: `/opt/foxops/releases`; versão ativa: `/opt/foxops/current`.
+- Banco e chave mestre: `/var/lib/foxops` (incluindo `.secrets/ai-master.key`).
+- Configuração: `/etc/foxops/foxops.env`, acessível somente por root.
+- Backups anteriores a atualizações: `/var/backups/foxops`.
+
+SMTP, Stripe, Mercado Pago, identidade visual e planos são configurados pela Administração da plataforma. Chaves de IA e notificações da organização são configuradas pelo proprietário do workspace.
+
+## Atualizar sem reinstalar os dados
+
+Gere e transfira um novo pacote; extraia em uma pasta separada e execute:
+
+```bash
+sudo bash deploy/install.sh
+```
+
+A configuração existente é preservada. A nova versão é compilada antes de parar o serviço. Depois o instalador para a aplicação, cria um backup com banco, arquivo mestre e configuração, troca a versão ativa e verifica `/health`. Haverá uma breve interrupção, inclusive dos terminais SSH.
+
+Se a ativação falhar, o instalador tenta voltar ao código e ao serviço anteriores. Ele **não desfaz migrações do banco automaticamente**; se a versão anterior não iniciar, restaure o backup completo de forma controlada com o serviço parado. Não apague a chave mestre: o banco sozinho não permite recuperar as credenciais criptografadas.
+
+Backups de atualização não substituem uma rotina periódica de backup externo. O instalador preserva releases e backups antigos; acompanhe o espaço em disco e remova versões antigas somente após validar a atualização.
+
+Referências de runtime: [downloads oficiais do Node.js](https://nodejs.org/en/download) e [requisitos de plataforma do Node.js](https://github.com/nodejs/node/blob/v24.x/BUILDING.md).
