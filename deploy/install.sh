@@ -240,11 +240,15 @@ HEALTH_URL=$(sed -n 's/^PUBLIC_URL=//p' "$ENV_FILE" | tail -n1)
 HEALTH_HOST=${HEALTH_URL#*://}
 HEALTH_HOST=${HEALTH_HOST%:443}
 healthy=0
+printf 'Aguardando inicialização da plataforma...\n'
 for ((i=0;i<30;i++)); do
-  if curl --noproxy '*' -fsS -H "Host: $HEALTH_HOST" "http://127.0.0.1:$HEALTH_PORT/health" > /dev/null && systemctl is-active --quiet foxops; then healthy=1; break; fi
+  if curl --noproxy '*' --connect-timeout 2 --max-time 5 -fsS -H "Host: $HEALTH_HOST" "http://127.0.0.1:$HEALTH_PORT/health" > /dev/null 2>"$TEMP/platform-health.error" && systemctl is-active --quiet foxops; then healthy=1; break; fi
   sleep 1
 done
-((healthy)) || fail 'Aplicação não respondeu à verificação de saúde.'
+if ((healthy == 0)); then
+  [[ ! -s "$TEMP/platform-health.error" ]] || tail -n 3 "$TEMP/platform-health.error" >&2
+  fail 'Aplicação não respondeu à verificação de saúde. Consulte journalctl -u foxops.'
+fi
 PHASE="emissão e validação do certificado HTTPS"
 if ((HTTPS_REQUIRED)); then
   CERT_EMAIL=$(sed -n 's/^FOXOPS_PLATFORM_ADMIN_EMAILS=//p' "$ENV_FILE" | tail -n1)

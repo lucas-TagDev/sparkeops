@@ -129,6 +129,7 @@ $HTTPS_DOMAIN {
   reverse_proxy 127.0.0.1:$port
 }
 CADDY
+  "$BASE/proxy/caddy" fmt --overwrite "$TEMP/new.Caddyfile"
   "$BASE/proxy/caddy" validate --config "$TEMP/new.Caddyfile" --adapter caddyfile
   HTTPS_CHANGED=1
   # Apenas o arquivo dedicado à plataforma é escrito. O Caddyfile global não é alterado.
@@ -171,12 +172,13 @@ UNIT
   local deadline=$((SECONDS+180))
   while ((SECONDS < deadline)); do
     # Não usa -k: certificado, nome do domínio e cadeia de confiança devem ser válidos.
-    if curl --noproxy '*' --connect-timeout 3 --max-time 5 --resolve "$HTTPS_DOMAIN:443:127.0.0.1" -fsS "https://$HTTPS_DOMAIN/health" >/dev/null && systemctl is-active --quiet sparkeops-https; then
+    if curl --noproxy '*' --connect-timeout 3 --max-time 5 --resolve "$HTTPS_DOMAIN:443:127.0.0.1" -fsS "https://$HTTPS_DOMAIN/health" >/dev/null 2>"$TEMP/https-health.error" && systemctl is-active --quiet sparkeops-https; then
       printf 'HTTPS validado: https://%s (certificado com renovação automática).\n' "$HTTPS_DOMAIN"
       return 0
     fi
     sleep 2
   done
+  [[ ! -s "$TEMP/https-health.error" ]] || tail -n 3 "$TEMP/https-health.error" >&2
   fail 'Certificado/HTTPS não ficou disponível. Confira DNS A/AAAA, portas 80/443, NAT e journalctl -u sparkeops-https. A instalação não foi marcada como concluída.'
 }
 
