@@ -38,7 +38,7 @@ sudo bash deploy/install.sh \
   --admin-email seu@email.com
 ```
 
-Em produção, configure também o DNS e o proxy HTTPS conforme o [guia completo](./instalacao-linux.md). O instalador não emite certificados nem instala o proxy. Cadastre a primeira conta no painel com o e-mail informado para administrar a plataforma.
+Em produção, o instalador configura o proxy HTTPS e emite o certificado automaticamente. **Antes de continuar, o domínio deve apontar para o servidor e as portas TCP 80 e 443 devem estar abertas no firewall, provedor e NAT.** O instalador exige essa confirmação e mantém a renovação automática do certificado. Cadastre a primeira conta no painel com o e-mail informado para administrar a plataforma.
 
 Para atualizar a instalação existente, dentro do clone:
 
@@ -90,15 +90,33 @@ sudo bash deploy/install.sh \
   --admin-email administrador@suaempresa.com
 ```
 
-Nesse modo a aplicação escuta somente em `127.0.0.1:8080`. Configure o DNS e um proxy HTTPS no mesmo servidor; o instalador não instala nem substitui o proxy existente e não emite certificados. Exemplo de configuração para um Caddy já instalado:
+Nesse modo o instalador executa toda a configuração do HTTPS:
 
-```caddyfile
-monitor.suaempresa.com {
-  reverse_proxy 127.0.0.1:8080
-}
+1. Exibe o aviso obrigatório e pede `SIM` confirmando DNS e portas abertas.
+2. Verifica se o domínio resolve e se as portas locais 80/443 estão disponíveis para o proxy da plataforma.
+3. Baixa o Caddy de uma release oficial e confere seu SHA-256.
+4. Cria o proxy dedicado `sparkeops-https`, apontando para a aplicação em `127.0.0.1:8080`, com suporte ao terminal WebSocket.
+5. Solicita o certificado público ao Let's Encrypt, configura redirecionamento HTTP → HTTPS e mantém renovação automática.
+6. Aguarda até 180 segundos e valida uma resposta HTTPS com certificado confiável antes de declarar sucesso.
+
+**Pré-requisitos obrigatórios:** registros DNS A e, quando existir, AAAA apontando corretamente para o servidor; portas TCP 80 e 443 liberadas no firewall do Linux, no provedor e no roteador/NAT. Também é necessário acesso de saída à internet. O instalador não tem como modificar DNS, firewall do provedor ou roteador por você. Um registro IPv6 incorreto também pode impedir a emissão.
+
+Em execução não interativa, confirme explicitamente os requisitos:
+
+```bash
+sudo bash deploy/install.sh \
+  --public-url https://monitor.suaempresa.com \
+  --admin-email administrador@suaempresa.com \
+  --confirm-dns-ports
 ```
 
-O proxy precisa aceitar WebSocket para o terminal SSH. Para certificados públicos, domínio, DNS e portas 80/443 precisam estar configurados adequadamente. Não exponha a porta interna diretamente nesse modo. O endereço HTTPS precisa funcionar para webhooks de pagamento e links enviados por e-mail.
+O aviso continua sendo exibido; a opção registra a confirmação sem pedir uma resposta no terminal. As atualizações em produção também exibem o aviso e pedem a confirmação.
+
+Se as portas estiverem ocupadas por Nginx, Apache ou outro proxy, o instalador para com uma explicação, sem substituir configurações ou parar esses serviços. Use um servidor dedicado ou libere as portas antes de tentar novamente. O domínio precisa ser público; não use IP, localhost ou um domínio interno para certificados públicos.
+
+O proxy usa `/etc/foxops/https.Caddyfile`, binário em `/opt/foxops/proxy/caddy` e dados persistentes em `/var/lib/sparkeops-https`. Ele não altera `/etc/caddy/Caddyfile`. O HTTPS local é verificado pelo instalador, mas a confirmação da acessibilidade externa depende das regras de rede informadas pelo operador.
+
+Se a emissão falhar, a instalação não é marcada como concluída. Consulte `sudo journalctl -u sparkeops-https` e corrija DNS/portas antes de repetir. Em uma atualização, o instalador tenta restaurar as configurações anteriores do proxy e da aplicação. O modo `--local` permanece HTTP e não instala o proxy.
 
 ## Administração e operação
 
@@ -130,3 +148,5 @@ Se a ativação falhar, o instalador tenta voltar ao código e ao serviço anter
 Backups de atualização não substituem uma rotina periódica de backup externo. O instalador preserva releases e backups antigos; acompanhe o espaço em disco e remova versões antigas somente após validar a atualização.
 
 Referências de runtime: [downloads oficiais do Node.js](https://nodejs.org/en/download) e [requisitos de plataforma do Node.js](https://github.com/nodejs/node/blob/v24.x/BUILDING.md).
+
+HTTPS automático: [documentação do Caddy](https://caddyserver.com/docs/automatic-https).

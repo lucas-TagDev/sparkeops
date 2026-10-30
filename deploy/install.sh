@@ -8,14 +8,14 @@ DATA=/var/lib/foxops
 ENV_FILE=/etc/foxops/foxops.env
 UNIT=/etc/systemd/system/foxops.service
 NODE_VERSION=24.22.2
-PUBLIC_URL= ADMIN_EMAIL= PORT=8080 LOCAL=0 CHECK=0
+PUBLIC_URL= ADMIN_EMAIL= PORT=8080 LOCAL=0 CHECK=0 CONFIRM_DNS_PORTS=0 HTTPS_REQUIRED=0
 SOURCE=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
 fail() { printf 'ERRO: %s\n' "$*" >&2; exit 1; }
 help() {
   cat <<'HELP'
 Instalador da plataforma SparkeOPS (Linux com systemd).
 
-Produção (proxy HTTPS necessário):
+Produção (HTTPS e certificado automáticos):
   sudo bash deploy/install.sh --public-url https://monitor.exemplo.com --admin-email admin@exemplo.com
 Rede local:
   sudo bash deploy/install.sh --local --public-url http://192.168.3.180:8080 --admin-email admin@exemplo.com
@@ -23,7 +23,8 @@ Atualização (usa configuração existente e faz backup antes de trocar):
   sudo bash deploy/install.sh
 
 Opções: --public-url URL, --admin-email EMAIL, --port 8080,
-        --local (HTTP somente para testes), --check (somente verificar), --help.
+        --local (HTTP somente para testes), --check (somente verificar),
+        --confirm-dns-ports (confirma DNS e portas 80/443), --help.
 Dados: /var/lib/foxops. Configuração: /etc/foxops/foxops.env.
 Não importa os dados de outra instalação automaticamente.
 HELP
@@ -35,6 +36,7 @@ while (($#)); do
       case "$1" in --public-url) PUBLIC_URL=$2;; --admin-email) ADMIN_EMAIL=$2;; --port) PORT=$2;; esac
       shift 2;;
     --local) LOCAL=1; shift;;
+    --confirm-dns-ports) CONFIRM_DNS_PORTS=1; shift;;
     --check) CHECK=1; shift;;
     --help|-h) help; exit 0;;
     *) fail "Opção desconhecida: $1";;
@@ -86,15 +88,25 @@ else
     [[ "$authority" == *":$PORT" || ("$PORT" == 80 && "$authority" != *:*) ]] || fail 'A porta da URL local precisa corresponder a --port.'
   fi
 fi
+SETUP_URL=$PUBLIC_URL
+if [[ -f "$ENV_FILE" ]]; then SETUP_URL=$(sed -n 's/^PUBLIC_URL=//p' "$ENV_FILE" | tail -n1); fi
+if [[ "$SETUP_URL" == https://* ]]; then
+  [[ -f "$SOURCE/deploy/https.sh" ]] || fail 'Pacote incompleto: deploy/https.sh'
+  . "$SOURCE/deploy/https.sh"
+  HTTPS_REQUIRED=1
+  https_notice "$SETUP_URL" "$CONFIRM_DNS_PORTS"
+  if [[ ! -f "$ENV_FILE" ]]; then PUBLIC_URL="https://$HTTPS_DOMAIN"; fi
+fi
 printf 'Instalando dependências do sistema...\n'
 case "$FAMILY" in
-  apt) export DEBIAN_FRONTEND=noninteractive; apt-get update; apt-get install -y ca-certificates curl tar xz-utils python3 make g++ libstdc++6 util-linux;;
-  dnf) command -v dnf >/dev/null || fail 'dnf é necessário nesta distribuição.'; dnf install -y ca-certificates curl tar xz python3 make gcc-c++ libstdc++ util-linux;;
-  zypper) zypper --non-interactive install ca-certificates curl tar xz python3 make gcc-c++ libstdc++6 util-linux;;
+  apt) export DEBIAN_FRONTEND=noninteractive; apt-get update; apt-get install -y ca-certificates curl tar xz-utils python3 make g++ libstdc++6 util-linux iproute2;;
+  dnf) command -v dnf >/dev/null || fail 'dnf é necessário nesta distribuição.'; dnf install -y ca-certificates curl tar xz python3 make gcc-c++ libstdc++ util-linux iproute;;
+  zypper) zypper --non-interactive install ca-certificates curl tar xz python3 make gcc-c++ libstdc++6 util-linux iproute2;;
 esac
 if [[ -f "$SOURCE/SHA256SUMS" ]]; then (cd "$SOURCE"; sha256sum --strict -c SHA256SUMS); fi
+getent group foxops >/dev/null || groupadd --system foxops
 if ! id foxops >/dev/null 2>&1; then
-  useradd --system --home-dir "$DATA" --shell /usr/sbin/nologin foxops
+  useradd --system --gid foxops --home-dir "$DATA" --shell /usr/sbin/nologin foxops
 else
   [[ $(id -u foxops) != 0 ]] || fail 'Usuário foxops não pode ser root.'
 fi
@@ -109,6 +121,7 @@ STOPPED=0 SWITCHED=0 SUCCESS=0
 cleanup() {
   code=$?
   if ((SUCCESS == 0 && STOPPED)); then
+    if ((HTTPS_REQUIRED)); then https_restore || true; fi
     systemctl stop foxops || true
     if ((SWITCHED)) && [[ -n "$PREVIOUS" && -d "$PREVIOUS" && -f "$TEMP/previous.service" ]]; then
       ln -sfn "$PREVIOUS" "$BASE/current.restore"
@@ -126,6 +139,7 @@ cleanup() {
   exit "$code"
 }
 trap cleanup EXIT
+if ((HTTPS_REQUIRED)); then https_prepare; fi
 NODE_HOME="$BASE/runtime/node-v$NODE_VERSION-linux-$ARCH"
 if [[ ! -x "$NODE_HOME/bin/node" ]]; then
   FILE="node-v$NODE_VERSION-linux-$ARCH.tar.xz"
@@ -170,7 +184,11 @@ if [[ -n "$PREVIOUS" ]]; then
   STOPPED=1
   BACKUP="/var/backups/foxops/pre-upgrade-$(date -u +%Y%m%dT%H%M%SZ)-$$.tar.gz"
   # Inclui banco, eventuais WALs, arquivo mestre e configuração. Nunca distribua este backup com o instalador.
-  tar -czf "$BACKUP" -C / etc/foxops var/lib/foxops
+  BACKUP_PATHS=(etc/foxops var/lib/foxops)
+  [[ ! -d /var/lib/sparkeops-https ]] || BACKUP_PATHS+=(var/lib/sparkeops-https)
+  [[ ! -f "$UNIT" ]] || BACKUP_PATHS+=(etc/systemd/system/foxops.service)
+  [[ ! -f /etc/systemd/system/sparkeops-https.service ]] || BACKUP_PATHS+=(etc/systemd/system/sparkeops-https.service)
+  tar -czf "$BACKUP" -C / "${BACKUP_PATHS[@]}"
   chmod 0600 "$BACKUP"
   printf 'Backup: %s\n' "$BACKUP"
 fi
@@ -211,17 +229,22 @@ systemctl restart foxops
 HEALTH_PORT=$(sed -n 's/^PORT=//p' "$ENV_FILE" | tail -n1)
 HEALTH_URL=$(sed -n 's/^PUBLIC_URL=//p' "$ENV_FILE" | tail -n1)
 HEALTH_HOST=${HEALTH_URL#*://}
+HEALTH_HOST=${HEALTH_HOST%:443}
 healthy=0
 for ((i=0;i<30;i++)); do
   if curl --noproxy '*' -fsS -H "Host: $HEALTH_HOST" "http://127.0.0.1:$HEALTH_PORT/health" > /dev/null && systemctl is-active --quiet foxops; then healthy=1; break; fi
   sleep 1
 done
 ((healthy)) || fail 'Aplicação não respondeu à verificação de saúde.'
+if ((HTTPS_REQUIRED)); then
+  CERT_EMAIL=$(sed -n 's/^FOXOPS_PLATFORM_ADMIN_EMAILS=//p' "$ENV_FILE" | tail -n1)
+  https_activate "$HEALTH_PORT" "${CERT_EMAIL%%,*}"
+fi
 SUCCESS=1
 printf '\nInstalação concluída: %s\nServiço: systemctl status foxops\nLogs: journalctl -u foxops -f\n' "$HEALTH_URL"
 printf 'Cadastre no painel a conta com o e-mail de administrador informado. Nenhuma senha padrão foi criada.\n'
-if [[ "$HEALTH_URL" == https://* ]]; then
-  printf 'Configure o proxy HTTPS para 127.0.0.1:%s. Exemplo com Caddy:\n%s {\n  reverse_proxy 127.0.0.1:%s\n}\n' "$HEALTH_PORT" "$HEALTH_HOST" "$HEALTH_PORT"
+if ((HTTPS_REQUIRED)); then
+  printf 'Proxy e certificado configurados. Renovação automática enquanto o domínio e o serviço permanecerem disponíveis.\nLogs HTTPS: journalctl -u sparkeops-https -f\n'
 else
   printf 'Modo local de testes. Libere a porta %s no firewall se necessário.\n' "$HEALTH_PORT"
 fi

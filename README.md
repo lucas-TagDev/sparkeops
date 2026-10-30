@@ -100,7 +100,7 @@ sudo bash deploy/install.sh \
   --admin-email seu@email.com
 ```
 
-Em produção, configure também o DNS e o proxy HTTPS conforme o [guia completo](docs/instalacao-linux.md). O instalador não emite certificados nem instala o proxy. Cadastre a primeira conta no painel com o e-mail informado para administrar a plataforma.
+Em produção, o instalador configura o proxy HTTPS e emite o certificado automaticamente. **Antes de continuar, o domínio deve apontar para o servidor e as portas TCP 80 e 443 devem estar abertas no firewall, provedor e NAT.** O instalador exige essa confirmação e mantém a renovação automática do certificado. Veja o [guia completo](docs/instalacao-linux.md). Cadastre a primeira conta no painel com o e-mail informado para administrar a plataforma.
 
 Para atualizar a instalação existente, dentro do clone:
 
