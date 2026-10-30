@@ -58,7 +58,7 @@ Os testes cobrem isolamento de contas e clientes, perfis, sessões, instalação
 
 ## Limites do MVP
 
-Preparado para uma instância Node.js com SQLite. Não foi publicado em domínio externo. IA paga e checkout real dependem das suas credenciais. O instalador systemd e a imagem Docker precisam ser validados no ambiente de destino; Linux/WSL e Docker não estão disponíveis nesta máquina. Recuperação de senha por e-mail, MFA e coleta de logs ficam fora desta versão.
+Preparado para uma instância Node.js com SQLite. Não foi publicado em domínio externo. IA paga e checkout real dependem das suas credenciais. O instalador systemd e a imagem Docker precisam ser validados no ambiente de destino; Linux/WSL e Docker não estão disponíveis nesta máquina. Recuperação de senha por e-mail exige configurar o SMTP da plataforma. MFA ainda não está implementado.
 
 Veja [Serviços, logs e ações aprovadas por SSH](docs/SERVICES-SSH.md) para configurar nginx, Apache e PHP-FPM.
 
@@ -71,6 +71,45 @@ Interface em Português, Inglês e Espanhol, com preferência por usuário e idi
 
 Marca global configurável por administradores explícitos: nome, logo, favicon e cor principal. Veja [Identidade visual](docs/BRANDING.md).
 
+
+## Instalar diretamente pelo GitHub
+
+O repositório é privado. Autentique sua conta do GitHub com acesso ao projeto; não coloque tokens na URL nem nos comandos salvos.
+
+Instale o Git, se necessário (`sudo apt install git` no Debian/Ubuntu ou `sudo dnf install git` no Rocky/AlmaLinux/Fedora). Depois:
+
+```bash
+git clone https://github.com/lucas-TagDev/sparkeops.git
+cd sparkeops
+bash deploy/install.sh --check
+```
+
+Para teste na rede local, substitua o IP pelo endereço do Linux que hospedará o painel e informe seu e-mail:
+
+```bash
+sudo bash deploy/install.sh --local \
+  --public-url http://IP_DO_LINUX:8080 \
+  --admin-email seu@email.com
+```
+
+Para produção com domínio HTTPS:
+
+```bash
+sudo bash deploy/install.sh \
+  --public-url https://monitor.suaempresa.com \
+  --admin-email seu@email.com
+```
+
+Em produção, configure também o DNS e o proxy HTTPS conforme o [guia completo](docs/instalacao-linux.md). O instalador não emite certificados nem instala o proxy. Cadastre a primeira conta no painel com o e-mail informado para administrar a plataforma.
+
+Para atualizar a instalação existente, dentro do clone:
+
+```bash
+git pull --ff-only
+sudo bash deploy/install.sh
+```
+
+O instalador preserva as configurações existentes e faz backup dos dados antes da troca de versão. Não repita as opções da primeira instalação na atualização.
 
 ## Instalador da plataforma no Linux
 

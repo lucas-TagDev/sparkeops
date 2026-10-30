@@ -10,6 +10,45 @@ Alvos recomendados para homologação: Ubuntu 22.04/24.04, Debian 12/13 e Rocky/
 
 O Node 24.22.2 é instalado de forma isolada em `/opt/foxops/runtime`, sem substituir o Node do sistema. O arquivo vem do domínio oficial nodejs.org e seu SHA-256 é conferido com o manifesto oficial. O aplicativo roda como usuário `foxops`, sem privilégios de root.
 
+## Instalar diretamente pelo GitHub
+
+O repositório é privado. Autentique sua conta do GitHub com acesso ao projeto; não coloque tokens na URL nem nos comandos salvos.
+
+Instale o Git, se necessário (`sudo apt install git` no Debian/Ubuntu ou `sudo dnf install git` no Rocky/AlmaLinux/Fedora). Depois:
+
+```bash
+git clone https://github.com/lucas-TagDev/sparkeops.git
+cd sparkeops
+bash deploy/install.sh --check
+```
+
+Para teste na rede local, substitua o IP pelo endereço do Linux que hospedará o painel e informe seu e-mail:
+
+```bash
+sudo bash deploy/install.sh --local \
+  --public-url http://IP_DO_LINUX:8080 \
+  --admin-email seu@email.com
+```
+
+Para produção com domínio HTTPS:
+
+```bash
+sudo bash deploy/install.sh \
+  --public-url https://monitor.suaempresa.com \
+  --admin-email seu@email.com
+```
+
+Em produção, configure também o DNS e o proxy HTTPS conforme o [guia completo](./instalacao-linux.md). O instalador não emite certificados nem instala o proxy. Cadastre a primeira conta no painel com o e-mail informado para administrar a plataforma.
+
+Para atualizar a instalação existente, dentro do clone:
+
+```bash
+git pull --ff-only
+sudo bash deploy/install.sh
+```
+
+O instalador preserva as configurações existentes e faz backup dos dados antes da troca de versão. Não repita as opções da primeira instalação na atualização.
+
 ## Gerar e transferir o pacote
 
 Na máquina do projeto:
