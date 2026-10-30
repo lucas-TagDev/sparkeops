@@ -150,3 +150,31 @@ Backups de atualização não substituem uma rotina periódica de backup externo
 Referências de runtime: [downloads oficiais do Node.js](https://nodejs.org/en/download) e [requisitos de plataforma do Node.js](https://github.com/nodejs/node/blob/v24.x/BUILDING.md).
 
 HTTPS automático: [documentação do Caddy](https://caddyserver.com/docs/automatic-https).
+
+
+## Remover a instalação
+
+Dentro do clone do GitHub, atualize os scripts e simule a remoção:
+
+```bash
+git pull --ff-only
+sudo bash deploy/uninstall.sh --dry-run
+```
+
+Para desinstalar o programa e os serviços, **preservando banco, credenciais e certificados**:
+
+```bash
+sudo bash deploy/uninstall.sh
+```
+
+Digite `REMOVER` quando solicitado. A remoção para os serviços da plataforma e do HTTPS, remove os arquivos da aplicação e libera as portas usadas pelo proxy. Não remove os agentes dos servidores monitorados, o clone do repositório nem configurações de proxies de terceiros.
+
+Para apagar também banco, credenciais, arquivo mestre, configurações e certificados:
+
+```bash
+sudo bash deploy/uninstall.sh --purge-data
+```
+
+Será obrigatório digitar `APAGAR DADOS`. O parâmetro `--yes` não dispensa essa confirmação. Os backups anteriores em `/var/backups/foxops` e os usuários de serviço sem login são preservados em todos os modos. Guarde um backup externo antes de excluir os dados.
+
+Uma reinstalação padrão reaproveita os dados preservados. Execute o instalador sem repetir as opções da primeira instalação se `/etc/foxops/foxops.env` ainda existir.

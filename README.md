@@ -119,3 +119,8 @@ Gere o pacote com `npm run package:linux`. O guia [Instalação Linux](docs/inst
 ## CAPTCHA nos formulários públicos
 
 Configure o **Cloudflare Turnstile** em **Administração da plataforma → Segurança e CAPTCHA**. Informe Site Key e Secret Key, teste o desafio no painel e habilite separadamente cadastro, login e solicitação/redefinição de senha. A Secret Key fica criptografada e a validação também ocorre no servidor. Veja o [guia Turnstile](docs/turnstile.md).
+
+
+## Desinstalar
+
+No Linux, execute `sudo bash deploy/uninstall.sh` para remover programa e serviços preservando os dados. Use `--dry-run` para simular ou `--purge-data` para remover também os dados, com confirmação obrigatória. Veja os detalhes no [guia Linux](docs/instalacao-linux.md#remover-a-instalação).

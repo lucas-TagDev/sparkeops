@@ -21,6 +21,7 @@ test(
   { skip: !bash },
   () => {
     execFileSync(bash!, ["-n", "deploy/install.sh"]);
+    execFileSync(bash!, ["-n", "deploy/uninstall.sh"]);
     execFileSync(bash!, ["-n", helper]);
     for (const url of [
       "https://monitor.example.com",
@@ -182,5 +183,23 @@ test(
     assert.equal(loaded.status, 0);
     assert.equal(loaded.stdout, "STOP");
     assert.equal(run("loaded", "5").status, 5);
+  },
+);
+
+test(
+  "Uninstaller dry-run never stops services or removes files, including purge preview",
+  { skip: !bash },
+  () => {
+    const script = resolve("deploy/uninstall.sh").replaceAll("\\", "/");
+    const command =
+      'uname() { printf "Linux\\n"; }; systemctl() { printf "UNEXPECTED_SERVICE_MUTATION" >&2; return 99; }; rm() { printf "UNEXPECTED_DELETE" >&2; return 99; }; export -f uname systemctl rm; bash "$1" --dry-run "$2"';
+    for (const option of ["--yes", "--purge-data"]) {
+      const result = spawnSync(bash!, ["-c", command, "_", script, option], {
+        encoding: "utf8",
+      });
+      assert.equal(result.status, 0, result.stderr);
+      assert.match(result.stdout, /Nenhuma alteração realizada/);
+      assert.ok(!result.stderr.includes("UNEXPECTED"));
+    }
   },
 );
