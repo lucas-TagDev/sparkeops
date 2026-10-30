@@ -56,6 +56,16 @@ export class AISettings {
       if (
         (this.platform.store.db
           .prepare(
+            "SELECT 1 FROM sqlite_master WHERE name='turnstile_settings'",
+          )
+          .get() &&
+          this.platform.store.db
+            .prepare(
+              "SELECT 1 FROM turnstile_settings WHERE secret<>'' LIMIT 1",
+            )
+            .get()) ||
+        (this.platform.store.db
+          .prepare(
             "SELECT 1 FROM sqlite_master WHERE name='platform_email_config'",
           )
           .get() &&

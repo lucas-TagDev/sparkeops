@@ -1,3 +1,4 @@
+import { TurnstileSettingsPanel } from "./TurnstileSettingsPanel.tsx";
 import { BrandingPanel } from "./BrandingPanel.tsx";
 import { PlatformEmailPanel } from "./PlatformEmailPanel.tsx";
 import { AccountAdministration } from "./AccountAdministration.tsx";
@@ -29,6 +30,13 @@ export function PlatformAdminPanel({ userId }: { userId: string }) {
         role="tablist"
         aria-label={t("Administração da plataforma")}
       >
+        <button
+          role="tab"
+          aria-selected={section === "security"}
+          onClick={() => setSection("security")}
+        >
+          {t("Segurança e CAPTCHA")}
+        </button>
         <button
           role="tab"
           aria-selected={section === "branding"}
@@ -72,7 +80,9 @@ export function PlatformAdminPanel({ userId }: { userId: string }) {
           {t("Pagamentos")}
         </button>
       </div>
-      {section === "branding" ? (
+      {section === "security" ? (
+        <TurnstileSettingsPanel />
+      ) : section === "branding" ? (
         <BrandingPanel />
       ) : section === "email" ? (
         <PlatformEmailPanel />

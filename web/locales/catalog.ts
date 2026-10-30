@@ -1,3 +1,4 @@
+import { turnstileRows } from "./turnstile.ts";
 import { settingsRows } from "./settings.ts";
 import { recoveryRows } from "./service-recovery.ts";
 import { platformEmailRows } from "./platform-email.ts";
@@ -559,7 +560,9 @@ for (const row of (
   "\n" +
   recoveryRows +
   "\n" +
-  settingsRows
+  settingsRows +
+  "\n" +
+  turnstileRows
 )
   .trim()
   .split("\n")) {

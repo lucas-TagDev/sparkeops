@@ -1,3 +1,4 @@
+import { Turnstile } from "./turnstile.ts";
 import { StripeSettings } from "./stripe-settings.ts";
 import { ServiceRecovery } from "./service-recovery.ts";
 import { PlatformEmail } from "./platform-email.ts";
@@ -40,6 +41,7 @@ export type AppOptions = {
   urlProbe?: URLProbe;
   mercadoPagoFetch?: typeof fetch;
   stripeSettingsFetch?: typeof fetch;
+  turnstileFetch?: typeof fetch;
   platformAdmins?: string[];
   origin?: string;
   ai?: AIConfig;
@@ -69,6 +71,13 @@ export function createApp(
     aiSettings,
     branding,
     options.origin ?? "http://localhost:8080",
+  );
+  const turnstile = new Turnstile(
+    platform,
+    aiSettings,
+    administration,
+    options.origin ?? options.billing?.origin ?? "http://localhost:8080",
+    options.turnstileFetch,
   );
   const notifications = new Notifications(platform, aiSettings);
   const operations = new Operations(platform, aiSettings, options.sshExecutor);
@@ -182,7 +191,7 @@ export function createApp(
       res.setHeader("X-Frame-Options", "DENY");
       res.setHeader(
         "Content-Security-Policy",
-        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+        "default-src 'self'; script-src 'self' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
       );
       if (req.path.startsWith("/api") || req.path === "/mcp")
         res.setHeader("Cache-Control", "no-store");
@@ -282,8 +291,13 @@ export function createApp(
   });
   const authRoute =
     (method: "signup" | "login" | "acceptInvite") =>
-    (req: Request, res: Response) => {
+    async (req: Request, res: Response) => {
       limit("auth:" + req.ip, 15, 900);
+      await turnstile.verify(
+        method === "login" ? "login" : "signup",
+        body(req).captcha_token,
+        req.ip,
+      );
       const result = platform[method](body(req));
       if (method === "signup") {
         try {
@@ -297,23 +311,28 @@ export function createApp(
         .status(method === "signup" ? 201 : 200)
         .json({ user: result.principal });
     };
-  app.post("/api/auth/forgot-password", (req, res) => {
+  app.post("/api/auth/forgot-password", async (req, res) => {
     limit("recover-ip:" + req.ip, 5, 900);
     limit(
       "recover-email:" + hash(String(body(req).email).trim().toLowerCase()),
       3,
       900,
     );
+    await turnstile.verify("forgot_password", body(req).captcha_token, req.ip);
     res.json(platformEmail.forgot(body(req).email));
   });
-  app.post("/api/auth/reset-password", (req, res) => {
+  app.post("/api/auth/reset-password", async (req, res) => {
     limit("reset:" + req.ip, 10, 900);
+    await turnstile.verify("reset_password", body(req).captcha_token, req.ip);
     res.json(platformEmail.reset(body(req)));
   });
   app.post("/api/auth/confirm-email", (req, res) => {
     limit("confirm-email:" + req.ip, 10, 900);
     res.json(platformEmail.confirmEmail(body(req).token));
   });
+  app.get("/api/auth/captcha", (_req, res) =>
+    res.json(turnstile.publicSettings()),
+  );
   app.post("/api/auth/signup", authRoute("signup"));
   app.post("/api/auth/login", authRoute("login"));
   app.post("/api/auth/accept-invite", authRoute("acceptInvite"));
@@ -559,6 +578,23 @@ export function createApp(
   );
   app.post("/api/v1/servers/:id/runbook-runs/:run/reject", (req, res) => {
     runbooks.reject(p(res), String(req.params.id), String(req.params.run));
+    res.json({ ok: true });
+  });
+  app.get("/api/v1/platform/security/turnstile", (_req, res) =>
+    res.json(turnstile.metadata(p(res))),
+  );
+  app.put("/api/v1/platform/security/turnstile", (req, res) =>
+    res.json(turnstile.save(p(res), body(req))),
+  );
+  app.post("/api/v1/platform/security/turnstile/test", async (req, res) => {
+    administration.authorize(p(res));
+    limit("captcha-test:" + p(res).userId, 10);
+    await turnstile.verify(
+      "settings_test",
+      body(req).captcha_token,
+      req.ip,
+      true,
+    );
     res.json({ ok: true });
   });
   app.get("/api/v1/platform/payments/stripe", (_req, res) =>

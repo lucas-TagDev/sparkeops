@@ -1,3 +1,4 @@
+import { useCaptcha } from "./TurnstileWidget.tsx";
 import { RecoveryPolicyPanel } from "./RecoveryPolicyPanel.tsx";
 import {
   AccountRecovery,
@@ -1028,6 +1029,7 @@ function Auth({ onSuccess }: { onSuccess: () => Promise<void> }) {
     ),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
+  const captcha = useCaptcha(invite ? "signup" : mode);
   if (forgot)
     return <AccountRecovery kind="forgot" onBack={() => setForgot(false)} />;
   return (
@@ -1094,18 +1096,27 @@ function Auth({ onSuccess }: { onSuccess: () => Promise<void> }) {
             onSubmit={async (e) => {
               e.preventDefault();
               setError("");
+              if (!captcha.canSubmit) {
+                setError(tx("Conclua a verificação de segurança."));
+                return;
+              }
               setBusy(true);
               const data = Object.fromEntries(new FormData(e.currentTarget));
               try {
                 await api(
                   invite ? "/api/auth/accept-invite" : `/api/auth/${mode}`,
-                  invite ? { ...data, token: invite } : data,
+                  {
+                    ...data,
+                    ...(invite ? { token: invite } : {}),
+                    captcha_token: captcha.token,
+                  },
                 );
                 if (invite) history.replaceState(null, "", "/");
                 await onSuccess();
               } catch (e) {
                 setError((e as Error).message);
               } finally {
+                captcha.reset();
                 setBusy(false);
               }
             }}
@@ -1170,7 +1181,11 @@ function Auth({ onSuccess }: { onSuccess: () => Promise<void> }) {
                 {error}
               </div>
             )}
-            <button className="primary full" disabled={busy}>
+            {captcha.element}
+            <button
+              className="primary full"
+              disabled={busy || !captcha.canSubmit}
+            >
               {busy
                 ? tx("Aguarde…")
                 : invite

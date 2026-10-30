@@ -114,3 +114,8 @@ O instalador preserva as configurações existentes e faz backup dos dados antes
 ## Instalador da plataforma no Linux
 
 Gere o pacote com `npm run package:linux`. O guia [Instalação Linux](docs/instalacao-linux.md) inclui instalação local, produção com HTTPS, atualização e backups. O instalador da plataforma é `deploy/install.sh`; o arquivo `agent/install.sh` instala somente o agente monitorado.
+
+
+## CAPTCHA nos formulários públicos
+
+Configure o **Cloudflare Turnstile** em **Administração da plataforma → Segurança e CAPTCHA**. Informe Site Key e Secret Key, teste o desafio no painel e habilite separadamente cadastro, login e solicitação/redefinição de senha. A Secret Key fica criptografada e a validação também ocorre no servidor. Veja o [guia Turnstile](docs/turnstile.md).

@@ -5503,3 +5503,12 @@ input[type="datetime-local"] {
   margin: 16px auto 0;
   font-size: 12px;
 }
+
+.captcha-field {
+  margin: 16px 0;
+  width: 100%;
+  min-width: 0;
+}
+.captcha-field > div {
+  min-height: 65px;
+}

@@ -1,3 +1,4 @@
+import { useCaptcha } from "./TurnstileWidget.tsx";
 import { useEffect, useState } from "react";
 import { api, stamp } from "./api.ts";
 import { t } from "./i18n.ts";
@@ -233,6 +234,13 @@ export function AccountRecovery({
   const [error, setError] = useState(""),
     [message, setMessage] = useState(""),
     [busy, setBusy] = useState(false);
+  const captcha = useCaptcha(
+    kind === "confirm-email"
+      ? null
+      : kind === "forgot"
+        ? "forgot_password"
+        : "reset_password",
+  );
   return (
     <div className="loading">
       <section className="panel padded" style={{ width: "min(480px,90vw)" }}>
@@ -261,6 +269,10 @@ export function AccountRecovery({
                 setError(t("As senhas não coincidem."));
                 return;
               }
+              if (!captcha.canSubmit) {
+                setError(t("Conclua a verificação de segurança."));
+                return;
+              }
               setBusy(true);
               setError("");
               try {
@@ -271,7 +283,7 @@ export function AccountRecovery({
                       : kind === "reset"
                         ? "reset-password"
                         : "confirm-email"),
-                  { ...data, token },
+                  { ...data, token, captcha_token: captcha.token },
                 );
                 setMessage(
                   t(
@@ -286,6 +298,7 @@ export function AccountRecovery({
               } catch (e) {
                 setError((e as Error).message);
               } finally {
+                captcha.reset();
                 setBusy(false);
               }
             }}
@@ -332,7 +345,8 @@ export function AccountRecovery({
                   : "O link é válido por 30 minutos e pode ser usado uma única vez.",
               )}
             </p>
-            <button className="primary" disabled={busy}>
+            {captcha.element}
+            <button className="primary" disabled={busy || !captcha.canSubmit}>
               {t(
                 busy
                   ? "Aguarde…"
