@@ -11,3 +11,9 @@ Copie o link e abra no navegador da TV, sem login. O painel atualiza a cada 15 s
 Para interromper o acesso, desative ou exclua o painel. **Trocar link** invalida imediatamente o anterior: atualize o endereço na TV. O link também fica indisponível enquanto a assinatura/avaliação da organização estiver inativa. Nenhum histórico é excluído por essa funcionalidade.
 
 Use o domínio HTTPS público da instalação para acesso fora da rede. Um endereço de rede local só funcionará em dispositivos que consigam alcançar essa rede.
+
+## Grid e filtros
+
+Na edição do painel, configure as colunas (automático ou de 1 a 6), o tamanho dos cartões (compacto ou confortável), os itens por página (4, 6, 8, 12, 16 ou 24) e o intervalo de rotação (10, 20, 30 ou 60 segundos). Telas menores adaptam as colunas para manter a leitura. Os painéis existentes recebem os valores padrão e mantêm o mesmo link.
+
+Na tela pública, use a busca por nome e os filtros de tipo e estado. A paginação e a rotação consideram somente os resultados encontrados, sempre dentro dos recursos publicados pelo administrador. Os filtros de visualização não alteram a configuração salva.

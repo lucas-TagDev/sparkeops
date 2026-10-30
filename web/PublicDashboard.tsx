@@ -1,4 +1,4 @@
-import { useEffect, useState, useId } from "react";
+import { useEffect, useState, useId, type CSSProperties } from "react";
 import {
   Maximize,
   RefreshCw,
@@ -30,7 +30,7 @@ function TrendChart({
     (p) => p.value != null && Number.isFinite(p.value),
   );
   if (!valid.length)
-    return <div className="tv-chart-empty">{t("Aguardando hist�rico")}</div>;
+    return <div className="tv-chart-empty">{t("Aguardando histórico")}</div>;
   const start = points[0].at,
     end = points[points.length - 1].at,
     low = Math.min(...valid.map((p) => p.value!)),
@@ -66,9 +66,9 @@ function TrendChart({
       <figcaption>
         <span>{label}</span>
         <small>
-          {t("M�n.")}{" "}
-          {low.toLocaleString(getLanguage(), { maximumFractionDigits: 1 })} �{" "}
-          {t("M�x.")}{" "}
+          {t("Mín.")}{" "}
+          {low.toLocaleString(getLanguage(), { maximumFractionDigits: 1 })} ·{" "}
+          {t("Máx.")}{" "}
           {high.toLocaleString(getLanguage(), { maximumFractionDigits: 1 })}
         </small>
       </figcaption>
@@ -125,7 +125,7 @@ function TrendChart({
             fill="currentColor"
           >
             <title>
-              {stampSeconds(p.at)} � {p.value}
+              {stampSeconds(p.at)} · {p.value}
             </title>
           </circle>
         ))}
@@ -154,9 +154,19 @@ export function PublicDashboard() {
     [error, setError] = useState(""),
     [page, setPage] = useState(1),
     [kind, setKind] = useState("all"),
+    [search, setSearch] = useState(""),
+    [query, setQuery] = useState(""),
+    [status, setStatus] = useState("all"),
     [auto, setAuto] = useState(true),
     [refresh, setRefresh] = useState(0),
     [clock, setClock] = useState(new Date());
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setQuery(search);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
   useEffect(() => {
     const timer = setInterval(() => setClock(new Date()), 1000);
     return () => clearInterval(timer);
@@ -172,7 +182,14 @@ export function PublicDashboard() {
       const timeout = setTimeout(() => controller.abort(), 10000);
       try {
         const response = await fetch(
-          "/api/public/dashboard?page=" + page + "&kind=" + kind,
+          "/api/public/dashboard?page=" +
+            page +
+            "&kind=" +
+            kind +
+            "&search=" +
+            encodeURIComponent(query) +
+            "&status=" +
+            status,
           {
             headers: { Authorization: "Bearer " + token },
             credentials: "omit",
@@ -215,15 +232,15 @@ export function PublicDashboard() {
       controller?.abort();
       clearInterval(timer);
     };
-  }, [token, page, kind, refresh]);
+  }, [token, page, kind, refresh, query, status]);
   useEffect(() => {
     if (!auto || !data || data.pages < 2) return;
     const timer = setInterval(
       () => setPage((value) => (value >= data.pages ? 1 : value + 1)),
-      20000,
+      (data.layout.rotation_seconds ?? 20) * 1000,
     );
     return () => clearInterval(timer);
-  }, [auto, data?.pages]);
+  }, [auto, data?.pages, data?.layout.rotation_seconds]);
   const labels = {
     up: t("Online"),
     down: t("Indisponível"),
@@ -340,7 +357,40 @@ export function PublicDashboard() {
               {stampSeconds(data.generated_at)}
             </span>
           </div>
-          <section className="tv-card-grid">
+          <div className="tv-filters">
+            <input
+              maxLength={120}
+              aria-label={t("Buscar monitores")}
+              placeholder={t("Buscar monitores")}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            <select
+              aria-label={t("Status")}
+              value={status}
+              onChange={(e) => {
+                setStatus(e.target.value);
+                setPage(1);
+              }}
+            >
+              <option value="all">{t("Todos os estados")}</option>
+              {Object.entries(labels).map(([key, label]) => (
+                <option key={key} value={key}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <section
+            className={
+              "tv-card-grid tv-density-" +
+              data.layout.density +
+              (data.layout.columns ? " tv-fixed-grid" : "")
+            }
+            style={
+              { "--tv-columns": data.layout.columns || 3 } as CSSProperties
+            }
+          >
             {data.items.map((item) => (
               <article
                 className={"tv-monitor-card " + item.status}
@@ -396,7 +446,7 @@ export function PublicDashboard() {
                     {(
                       [
                         ["cpu", "CPU", "#64dfb2"],
-                        ["memory", t("Mem�ria"), "#b6a0ee"],
+                        ["memory", t("Memória"), "#b6a0ee"],
                         ["disk", t("Disco"), "#76acfa"],
                       ] as const
                     ).map(([key, label, color]) => (
@@ -426,7 +476,7 @@ export function PublicDashboard() {
                       </div>
                     </div>
                     <TrendChart
-                      label={t("Hist�rico de lat�ncia (ms)")}
+                      label={t("Histórico de latência (ms)")}
                       color="#64dfb2"
                       points={(item.history ?? []).map((p) => ({
                         at: p.at,

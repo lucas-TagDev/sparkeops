@@ -1,3 +1,9 @@
+export type PublicDashboardLayout = {
+  columns: number;
+  page_size: number;
+  density: "compact" | "comfortable";
+  rotation_seconds: number;
+};
 export type PublicDashboardMode = "none" | "all" | "selected";
 export type PublicDashboardConfig = {
   id: string;
@@ -10,6 +16,7 @@ export type PublicDashboardConfig = {
   show_metrics: boolean;
   show_addresses: boolean;
   link: string;
+  layout?: PublicDashboardLayout;
 };
 export type PublicDashboardCard = {
   key: string;
@@ -32,6 +39,7 @@ export type PublicDashboardCard = {
 export type PublicDashboardSnapshot = {
   title: string;
   generated_at: number;
+  layout: PublicDashboardLayout;
   refresh_seconds: number;
   total: number;
   page: number;

@@ -4,6 +4,7 @@ import { hash, now, type Platform, type Principal } from "./platform.ts";
 import type { AISettings } from "./ai-settings.ts";
 import type {
   PublicDashboardConfig,
+  PublicDashboardLayout,
   PublicDashboardMode,
   PublicDashboardSnapshot,
   PublicDashboardCard,
@@ -21,6 +22,7 @@ type Row = {
   url_ids: string;
   show_metrics: number;
   show_addresses: number;
+  layout: string;
 };
 type Resource = {
   id: string;
@@ -49,6 +51,35 @@ export class PublicDashboards {
     platform.store.db.exec(
       `CREATE TABLE IF NOT EXISTS public_dashboards(id TEXT PRIMARY KEY,tenant_id TEXT NOT NULL,title TEXT NOT NULL,token_hash TEXT NOT NULL UNIQUE,encrypted_token TEXT NOT NULL,enabled INTEGER NOT NULL,servers TEXT NOT NULL,server_ids TEXT NOT NULL,urls TEXT NOT NULL,url_ids TEXT NOT NULL,show_metrics INTEGER NOT NULL,show_addresses INTEGER NOT NULL); CREATE INDEX IF NOT EXISTS public_dashboards_tenant ON public_dashboards(tenant_id);`,
     );
+    if (
+      !platform.store.db
+        .prepare("PRAGMA table_info(public_dashboards)")
+        .all()
+        .some((c) => c.name === "layout")
+    )
+      platform.store.db.exec(
+        "ALTER TABLE public_dashboards ADD COLUMN layout TEXT NOT NULL DEFAULT '{}'",
+      );
+  }
+  private layout(value: unknown): PublicDashboardLayout {
+    const input = (value && typeof value === "object" ? value : {}) as Record<
+      string,
+      unknown
+    >;
+    const result = {
+      columns: Number(input.columns ?? 0),
+      page_size: Number(input.page_size ?? 12),
+      density: String(input.density ?? "comfortable"),
+      rotation_seconds: Number(input.rotation_seconds ?? 20),
+    };
+    if (
+      ![0, 1, 2, 3, 4, 5, 6].includes(result.columns) ||
+      ![4, 6, 8, 12, 16, 24].includes(result.page_size) ||
+      !["compact", "comfortable"].includes(result.density) ||
+      ![10, 20, 30, 60].includes(result.rotation_seconds)
+    )
+      throw new APIError(400, "Invalid dashboard layout.");
+    return result as PublicDashboardLayout;
   }
   private authorize(p: Principal) {
     this.platform.requireRole(p, ["owner", "admin"]);
@@ -82,6 +113,7 @@ export class PublicDashboards {
         .map((item) => String(item.id)),
     );
     return {
+      layout: this.layout(JSON.parse(row.layout)),
       id: row.id,
       title: row.title,
       enabled: !!row.enabled,
@@ -133,6 +165,9 @@ export class PublicDashboards {
   save(p: Principal, id: string | undefined, data: Record<string, unknown>) {
     this.authorize(p);
     const old = id ? this.row(p, id) : undefined;
+    const layout = this.layout(
+      data.layout ?? (old ? JSON.parse(old.layout) : undefined),
+    );
     if (
       !old &&
       Number(
@@ -204,7 +239,7 @@ export class PublicDashboards {
     this.platform.transaction(() => {
       this.platform.store.db
         .prepare(
-          "INSERT INTO public_dashboards VALUES(?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET title=excluded.title,enabled=excluded.enabled,servers=excluded.servers,server_ids=excluded.server_ids,urls=excluded.urls,url_ids=excluded.url_ids,show_metrics=excluded.show_metrics,show_addresses=excluded.show_addresses",
+          "INSERT INTO public_dashboards(id,tenant_id,title,token_hash,encrypted_token,enabled,servers,server_ids,urls,url_ids,show_metrics,show_addresses,layout) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET title=excluded.title,enabled=excluded.enabled,servers=excluded.servers,server_ids=excluded.server_ids,urls=excluded.urls,url_ids=excluded.url_ids,show_metrics=excluded.show_metrics,show_addresses=excluded.show_addresses,layout=excluded.layout",
         )
         .run(
           boardId,
@@ -219,6 +254,7 @@ export class PublicDashboards {
           JSON.stringify(urls),
           data.show_metrics ? 1 : 0,
           data.show_addresses ? 1 : 0,
+          JSON.stringify(layout),
         );
       this.platform.audit(
         p,
@@ -339,11 +375,26 @@ export class PublicDashboards {
     const kind = String(input.kind ?? "all");
     if (!["all", "server", "url"].includes(kind))
       throw new APIError(400, "Filtro inválido.");
-    const filtered = rows.filter((row) => kind === "all" || row.kind === kind),
-      size = Number(input.page_size ?? 12),
+    const layout = this.layout(JSON.parse(board.layout));
+    const search = String(input.search ?? "")
+      .trim()
+      .toLocaleLowerCase();
+    const status = String(input.status ?? "all");
+    if (
+      search.length > 120 ||
+      !["all", "up", "down", "pending", "paused"].includes(status)
+    )
+      throw new APIError(400, "Invalid dashboard filter.");
+    const filtered = rows.filter(
+        (row) =>
+          (kind === "all" || row.kind === kind) &&
+          (status === "all" || this.status(row) === status) &&
+          row.name.toLocaleLowerCase().includes(search),
+      ),
+      size = Number(input.page_size ?? layout.page_size),
       requested = Number(input.page ?? 1);
     if (
-      ![12, 24].includes(size) ||
+      ![4, 6, 8, 12, 16, 24].includes(size) ||
       !Number.isInteger(requested) ||
       requested < 1 ||
       requested > 100000
@@ -434,6 +485,7 @@ export class PublicDashboards {
         return card;
       });
     return {
+      layout,
       title: board.title,
       generated_at: now(),
       refresh_seconds: 15,

@@ -18,6 +18,12 @@ import type {
 type Draft = Omit<PublicDashboardConfig, "id" | "link"> & { id?: string };
 type Option = { id: string; name: string };
 const initial = (): Draft => ({
+  layout: {
+    columns: 0,
+    page_size: 12,
+    density: "comfortable",
+    rotation_seconds: 20,
+  },
   title: "Monitoramento",
   enabled: false,
   servers: "selected",
@@ -230,6 +236,114 @@ export function PublicDashboardManager() {
               onIDs={(url_ids) => setDraft({ ...draft, url_ids })}
             />
           </div>
+          <fieldset className="tv-layout-settings">
+            <legend>{t("Layout do painel")}</legend>
+            <div className="public-picker-grid">
+              <label>
+                {t("Colunas do grid")}
+                <select
+                  value={draft.layout?.columns ?? 0}
+                  onChange={(e) =>
+                    setDraft({
+                      ...draft,
+                      layout: {
+                        ...({
+                          columns: 0,
+                          page_size: 12,
+                          density: "comfortable",
+                          rotation_seconds: 20,
+                        } as const),
+                        ...draft.layout,
+                        columns: Number(e.target.value),
+                      },
+                    })
+                  }
+                >
+                  {[0, 1, 2, 3, 4, 5, 6].map((n) => (
+                    <option key={n} value={n}>
+                      {n === 0 ? t("Automático") : n}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                {t("Itens por página")}
+                <select
+                  value={draft.layout?.page_size ?? 12}
+                  onChange={(e) =>
+                    setDraft({
+                      ...draft,
+                      layout: {
+                        ...({
+                          columns: 0,
+                          page_size: 12,
+                          density: "comfortable",
+                          rotation_seconds: 20,
+                        } as const),
+                        ...draft.layout,
+                        page_size: Number(e.target.value),
+                      },
+                    })
+                  }
+                >
+                  {[4, 6, 8, 12, 16, 24].map((n) => (
+                    <option key={n}>{n}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                {t("Tamanho dos cartões")}
+                <select
+                  value={draft.layout?.density ?? "comfortable"}
+                  onChange={(e) =>
+                    setDraft({
+                      ...draft,
+                      layout: {
+                        ...({
+                          columns: 0,
+                          page_size: 12,
+                          density: "comfortable",
+                          rotation_seconds: 20,
+                        } as const),
+                        ...draft.layout,
+                        density: e.target.value as "compact" | "comfortable",
+                      },
+                    })
+                  }
+                >
+                  <option value="comfortable">{t("Confortável")}</option>
+                  <option value="compact">{t("Compacto")}</option>
+                </select>
+              </label>
+              <label>
+                {t("Intervalo de rotação")}
+                <select
+                  value={draft.layout?.rotation_seconds ?? 20}
+                  onChange={(e) =>
+                    setDraft({
+                      ...draft,
+                      layout: {
+                        ...({
+                          columns: 0,
+                          page_size: 12,
+                          density: "comfortable",
+                          rotation_seconds: 20,
+                        } as const),
+                        ...draft.layout,
+                        rotation_seconds: Number(e.target.value),
+                      },
+                    })
+                  }
+                >
+                  {[10, 20, 30, 60].map((n) => (
+                    <option key={n} value={n}>
+                      {n} s
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </fieldset>
           <label className="checkbox">
             <input
               type="checkbox"

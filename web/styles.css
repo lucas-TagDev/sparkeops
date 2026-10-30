@@ -6038,7 +6038,102 @@ input[type="datetime-local"] {
   }
 }
 @media (min-width: 900px) {
-  .tv-card-grid:has(> article:nth-child(2):last-child) {
+  .tv-card-grid:not(.tv-fixed-grid):has(> article:nth-child(2):last-child) {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.tv-card-heading > .tv-device-icon {
+  flex: 0 0 50px;
+  width: 50px;
+  height: 50px;
+  min-width: 50px;
+}
+.tv-filters {
+  display: flex;
+  gap: 12px;
+  margin: 18px 0;
+}
+.tv-filters input {
+  flex: 1;
+  max-width: 420px;
+}
+.tv-filters select {
+  width: 220px;
+}
+.tv-card-grid.tv-fixed-grid {
+  grid-template-columns: repeat(var(--tv-columns), minmax(0, 1fr));
+}
+.tv-density-compact .tv-monitor-card {
+  padding: 14px;
+}
+.tv-density-compact .tv-card-heading {
+  margin-bottom: 14px;
+  gap: 9px;
+}
+.tv-density-compact .tv-card-heading h2 {
+  font-size: 17px;
+}
+.tv-density-compact .tv-card-heading > .tv-device-icon {
+  flex-basis: 36px;
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  border-radius: 9px;
+}
+.tv-density-compact .tv-trend {
+  margin-top: 12px;
+}
+.tv-density-compact .tv-trend svg {
+  height: 65px;
+}
+.tv-density-compact .tv-server-charts .tv-trend svg {
+  height: 45px;
+}
+.tv-density-compact .tv-monitor-card footer {
+  margin-top: 12px;
+  padding-top: 10px;
+}
+.tv-density-compact .tv-metrics strong,
+.tv-density-compact .tv-url-metrics strong {
+  font-size: 22px;
+}
+.tv-trend figcaption {
+  flex-wrap: wrap;
+  line-height: 1.5;
+}
+.tv-card-heading h2 {
+  line-height: 1.25;
+}
+.tv-layout-settings {
+  border: 1px solid #334155;
+  border-radius: 10px;
+  padding: 20px;
+}
+.tv-layout-settings legend {
+  padding: 0 8px;
+  color: #c0d1e6;
+}
+@media (max-width: 1100px) {
+  .tv-card-grid.tv-fixed-grid {
+    grid-template-columns: repeat(min(var(--tv-columns), 3), minmax(0, 1fr));
+  }
+}
+@media (max-width: 760px) {
+  .tv-card-grid.tv-fixed-grid {
+    grid-template-columns: repeat(min(var(--tv-columns), 2), minmax(0, 1fr));
+  }
+  .tv-filters {
+    flex-wrap: wrap;
+  }
+}
+@media (max-width: 540px) {
+  .tv-card-grid.tv-fixed-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .tv-filters input,
+  .tv-filters select {
+    width: 100%;
+    max-width: none;
   }
 }

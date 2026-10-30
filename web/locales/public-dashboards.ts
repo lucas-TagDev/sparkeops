@@ -64,8 +64,16 @@ Ativar rotação|Enable rotation|Activar rotación
 Novo link gerado. O endereço anterior foi revogado.|New link generated. The previous address has been revoked.|Nuevo enlace generado. La dirección anterior ha sido revocada.
 Painel público excluído.|Public dashboard deleted.|Panel público eliminado.
 Iniciar rotação|Start rotation|Iniciar rotación
-Aguardando hist�rico|Awaiting history|Esperando historial
-Hist�rico de lat�ncia (ms)|Latency history (ms)|Historial de latencia (ms)
-M�n.|Min.|M�n.
-M�x.|Max.|M�x.
+Aguardando histórico|Awaiting history|Esperando historial
+Histórico de latência (ms)|Latency history (ms)|Historial de latencia (ms)
+Mín.|Min.|Mín.
+Máx.|Max.|Máx.
+Layout do painel|Dashboard layout|Diseño del panel
+Colunas do grid|Grid columns|Columnas del grid
+Itens por página|Items per page|Elementos por página
+Tamanho dos cartões|Card size|Tamaño de las tarjetas
+Confortável|Comfortable|Cómodo
+Compacto|Compact|Compacto
+Intervalo de rotação|Rotation interval|Intervalo de rotación
+Buscar monitores|Search monitors|Buscar monitores
 `;

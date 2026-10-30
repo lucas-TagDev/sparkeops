@@ -213,3 +213,68 @@ test("public dashboards: pagination and expired subscriptions do not expose stal
     .run(now() - 60, f.a.principal.tenantId);
   assert.throws(() => f.boards.snapshot(secret, {}));
 });
+test("public dashboards: saved grid settings, search and state filters remain within published resources", (t) => {
+  const f = setup(t),
+    layout = {
+      columns: 4,
+      page_size: 6,
+      density: "compact",
+      rotation_seconds: 30,
+    };
+  const board = f.boards.save(f.a.principal, undefined, {
+      ...f.config,
+      layout,
+    }),
+    secret = token(board.link);
+  assert.deepEqual(board.layout, layout);
+  assert.deepEqual(f.boards.snapshot(secret, {}).layout, layout);
+  assert.equal(f.boards.snapshot(secret, { search: "Ubuntu" }).total, 1);
+  assert.equal(
+    f.boards.snapshot(secret, { search: "Private tenant" }).total,
+    0,
+  );
+  assert.equal(f.boards.snapshot(secret, { status: "up" }).total, 0);
+  assert.equal(
+    f.boards.snapshot(secret, {
+      kind: "url",
+      search: "website",
+      status: "pending",
+    }).total,
+    1,
+  );
+  assert.throws(() =>
+    f.boards.save(f.a.principal, board.id, {
+      ...f.config,
+      layout: { ...layout, columns: 30 },
+    }),
+  );
+  assert.throws(() => f.boards.snapshot(secret, { status: "invalid" }));
+  for (let i = 0; i < 9; i++) f.store.register(f.org, "Node " + i);
+  const all = f.boards.save(f.a.principal, board.id, {
+    ...f.config,
+    servers: "all",
+  });
+  assert.deepEqual(all.layout, layout);
+  const snapshot = f.boards.snapshot(secret, {});
+  assert.equal(snapshot.items.length, 6);
+  assert.equal(snapshot.pages, 2);
+});
+test("public dashboards: older installations gain layout defaults without changing shared links", (t) => {
+  const f = setup(t),
+    board = f.boards.save(f.a.principal, undefined, f.config),
+    secret = token(board.link);
+  f.store.db.exec("ALTER TABLE public_dashboards DROP COLUMN layout");
+  const migrated = new PublicDashboards(
+    f.platform,
+    new AISettings(f.platform, { masterKey: Buffer.alloc(32, 7) }),
+    "https://monitor.example.com",
+  );
+  assert.deepEqual(migrated.list(f.a.principal)[0].layout, {
+    columns: 0,
+    page_size: 12,
+    density: "comfortable",
+    rotation_seconds: 20,
+  });
+  assert.equal(migrated.list(f.a.principal)[0].link, board.link);
+  assert.equal(migrated.snapshot(secret, {}).total, 2);
+});
