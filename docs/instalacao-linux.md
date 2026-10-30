@@ -94,7 +94,7 @@ Nesse modo o instalador executa toda a configuração do HTTPS:
 
 1. Exibe o aviso obrigatório e pede `SIM` confirmando DNS e portas abertas.
 2. Verifica se o domínio resolve e se as portas locais 80/443 estão disponíveis para o proxy da plataforma.
-3. Baixa o Caddy de uma release oficial e confere seu SHA-256.
+3. Baixa o Caddy de uma release oficial e confere o checksum publicado (SHA-256 ou SHA-512, conforme o manifesto).
 4. Cria o proxy dedicado `sparkeops-https`, apontando para a aplicação em `127.0.0.1:8080`, com suporte ao terminal WebSocket.
 5. Solicita o certificado público ao Let's Encrypt, configura redirecionamento HTTP → HTTPS e mantém renovação automática.
 6. Aguarda até 180 segundos e valida uma resposta HTTPS com certificado confiável antes de declarar sucesso.

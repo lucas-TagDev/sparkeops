@@ -6,6 +6,33 @@ HTTPS_DATA=/var/lib/sparkeops-https
 HTTPS_CHANGED=0
 HTTPS_WAS_ACTIVE=0
 
+https_verify_archive() {
+  python3 - "$1" "$2" "$3" <<'PY'
+import hashlib, hmac, pathlib, re, sys
+directory, name, manifest = sys.argv[1:]
+if pathlib.Path(name).name != name:
+    raise SystemExit('Nome do arquivo Caddy inválido.')
+matches = []
+for line in pathlib.Path(manifest).read_text(encoding='utf-8-sig').splitlines():
+    parts = line.split()
+    if len(parts) == 2 and parts[1].lstrip('*') == name:
+        matches.append(parts[0].lower())
+if len(matches) != 1:
+    raise SystemExit('Manifesto Caddy sem checksum único para o arquivo baixado.')
+expected = matches[0]
+if not re.fullmatch(r'[a-f0-9]+', expected) or len(expected) not in (64, 128):
+    raise SystemExit('Algoritmo de checksum Caddy desconhecido. Instalação interrompida.')
+algorithm = 'sha256' if len(expected) == 64 else 'sha512'
+digest = hashlib.new(algorithm)
+with open(pathlib.Path(directory) / name, 'rb') as archive:
+    for chunk in iter(lambda: archive.read(1024 * 1024), b''):
+        digest.update(chunk)
+if not hmac.compare_digest(digest.hexdigest(), expected):
+    raise SystemExit('Checksum Caddy divergente. Arquivo não será instalado.')
+print(f'Caddy: {algorithm.upper()} verificado com sucesso.')
+PY
+}
+
 https_domain() {
   local url=$1 domain
   [[ "$url" == https://* ]] || return 1
@@ -69,7 +96,7 @@ PY
     { read -r file; read -r archive_url; read -r checksums_url; } < "$TEMP/caddy-downloads"
     curl --proto '=https' --tlsv1.2 -fL --retry 3 "$archive_url" -o "$TEMP/$file"
     curl --proto '=https' --tlsv1.2 -fL --retry 3 "$checksums_url" -o "$TEMP/caddy-checksums.txt"
-    (cd "$TEMP"; awk -v name="$file" '$2==name {print}' caddy-checksums.txt > caddy.sha256; [[ -s caddy.sha256 ]]; sha256sum -c caddy.sha256)
+    https_verify_archive "$TEMP" "$file" "$TEMP/caddy-checksums.txt"
     tar -xzf "$TEMP/$file" -C "$TEMP" caddy
     install -m 0755 -o root -g root "$TEMP/caddy" "$BASE/proxy/caddy"
   fi

@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { existsSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { resolve, join } from "node:path";
+import { tmpdir } from "node:os";
+import { createHash } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
 const bash = ["/bin/bash", "C:/Program Files/Git/bin/bash.exe"].find(
   existsSync,
@@ -65,5 +67,55 @@ test(
     assert.equal(accepted.status, 0);
     assert.match(accepted.stdout, /80 e 443/);
     assert.match(accepted.stdout, /A e, se houver, AAAA/);
+  },
+);
+
+test(
+  "Caddy checksums: accepts official SHA-512 and SHA-256, rejects corruption and invalid manifests",
+  { skip: !bash },
+  () => {
+    const directory = mkdtempSync(join(tmpdir(), "sparkeops-caddy-check-"));
+    const name = "caddy_2.11.7_linux_amd64.tar.gz",
+      content = Buffer.from("archive test fixture"),
+      manifest = join(directory, "checksums.txt");
+    writeFileSync(join(directory, name), content);
+    const command =
+      (process.platform === "win32" ? 'python3() { python "$@"; }; ' : "") +
+      '. "$1"; https_verify_archive "$2" "$3" "$4"';
+    const verify = () =>
+      spawnSync(
+        bash!,
+        [
+          "-c",
+          command,
+          "_",
+          helper,
+          directory.replaceAll("\\", "/"),
+          name,
+          manifest.replaceAll("\\", "/"),
+        ],
+        { encoding: "utf8" },
+      );
+    try {
+      for (const algorithm of ["sha256", "sha512"]) {
+        const hash = createHash(algorithm).update(content).digest("hex");
+        writeFileSync(manifest, hash + "  " + name + "\r\n");
+        const result = verify();
+        assert.equal(result.status, 0, result.stderr);
+        assert.match(result.stdout, /verificado com sucesso/);
+      }
+      for (const invalid of [
+        "0".repeat(128) + "  " + name,
+        "a".repeat(40) + "  " + name,
+        createHash("sha512").update(content).digest("hex") +
+          "  another-file.tar.gz",
+        "not a checksum",
+      ]) {
+        writeFileSync(manifest, invalid + "\n");
+        assert.notEqual(verify().status, 0);
+      }
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   },
 );
