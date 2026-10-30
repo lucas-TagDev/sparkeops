@@ -1,4 +1,4 @@
-# FoxOps · Monitoramento Linux com MCP
+# SparkeOPS · Monitoramento Linux com MCP
 
 MVP integrado de SaaS para empresas e prestadores de TI: painel React, API Node.js/TypeScript, agente Linux Python, persistência SQLite, monitoramento contínuo e consultas por IA/MCP.
 

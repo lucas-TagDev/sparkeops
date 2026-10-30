@@ -55,7 +55,7 @@ Na máquina do projeto:
 
 ```powershell
 npm run package:linux
-scp releases/foxops-platform-0.1.0.tar.gz releases/foxops-platform-0.1.0.tar.gz.sha256 root@IP_DO_LINUX:/tmp/
+scp releases/sparkeops-platform-0.1.0.tar.gz releases/sparkeops-platform-0.1.0.tar.gz.sha256 root@IP_DO_LINUX:/tmp/
 ```
 
 O pacote exporta somente arquivos da aplicação. Não inclui `.env`, banco de clientes, chaves, node_modules nem backups da instalação atual. Uma instalação em outra máquina começa vazia; transferir os dados exige uma migração separada.
@@ -64,9 +64,9 @@ No Linux:
 
 ```bash
 cd /tmp
-sha256sum -c foxops-platform-0.1.0.tar.gz.sha256
-tar -xzf foxops-platform-0.1.0.tar.gz
-cd foxops-platform-0.1.0
+sha256sum -c sparkeops-platform-0.1.0.tar.gz.sha256
+tar -xzf sparkeops-platform-0.1.0.tar.gz
+cd sparkeops-platform-0.1.0
 bash deploy/install.sh --check
 ```
 

@@ -28,7 +28,7 @@ test("Linux release is self-contained and contains no local customer database or
     stdio: "pipe",
   });
   const version = JSON.parse(readFileSync("package.json", "utf8")).version;
-  const name = `foxops-platform-${version}`;
+  const name = `sparkeops-platform-${version}`;
   const archive = resolve("releases", `${name}.tar.gz`);
   const actual = createHash("sha256")
     .update(readFileSync(archive))

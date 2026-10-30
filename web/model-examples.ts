@@ -1,5 +1,5 @@
 // IDs verificados nos catálogos oficiais em 28/10/2026.
-// As descrições são sugestões de uso no FoxOps, não benchmarks entre provedores.
+// As descrições são sugestões de uso no SparkeOPS, não benchmarks entre provedores.
 export const MODEL_EXAMPLES: Record<
   string,
   { source: string; items: { id: string; label: string; use: string }[] }

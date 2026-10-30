@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-"""Opt-in execution for commands explicitly approved in FoxOps. Disabled by default."""
+"""Opt-in execution for commands explicitly approved in SparkeOPS. Disabled by default."""
 import base64
 import json
 import os

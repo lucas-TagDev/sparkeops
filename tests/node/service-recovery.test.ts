@@ -241,7 +241,7 @@ test("recovery ledger: records probe and restart, preserves gateway rejection an
     calls++;
     return commands.length === 1
       ? { code: 3, output: "inactive" }
-      : { code: 126, output: "FoxOps: comando não autorizado." };
+      : { code: 126, output: "SparkeOPS: comando não autorizado." };
   });
   f.recovery.save(f.user, f.id, "nginx", { enabled: true, confirm: true });
   f.state("failed");

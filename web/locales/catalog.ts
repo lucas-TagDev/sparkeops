@@ -272,7 +272,7 @@ Reinício: pode interromper conexões|Restart: may interrupt connections|Reinici
 recarregamento do serviço|service reload|recarga del servicio
 reinício do serviço (pode interromper conexões)|service restart (may interrupt connections)|reinicio del servicio (puede interrumpir conexiones)
 Ajuste numérico revisado no painel.|Numeric change reviewed in the dashboard.|Ajuste numérico revisado en el panel.
-FoxOps Assistente|FoxOps Assistant|Asistente FoxOps
+SparkeOPS Assistente|SparkeOPS Assistant|Asistente SparkeOPS
 Cliente da conversa|Conversation customer|Cliente de la conversación
 Servidor da conversa|Conversation server|Servidor de la conversación
 Conversa sobre|Conversation about|Conversación sobre

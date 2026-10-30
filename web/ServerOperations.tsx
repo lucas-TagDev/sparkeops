@@ -750,7 +750,7 @@ export function ServerOperations({
             )}
             <p className="muted">
               {tx(
-                "A aplicação FoxOps se conecta ao Ubuntu por SSH. O agente continua enviando métricas por saída; ele não precisa de acesso root para coletar métricas.",
+                "A aplicação SparkeOPS se conecta ao Ubuntu por SSH. O agente continua enviando métricas por saída; ele não precisa de acesso root para coletar métricas.",
               )}
             </p>
             <form

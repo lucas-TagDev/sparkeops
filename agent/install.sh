@@ -46,7 +46,7 @@ chown foxops-agent:foxops-agent /etc/foxops-agent/config.json
 chmod 0600 /etc/foxops-agent/config.json
 cat > /etc/systemd/system/foxops-agent.service <<'UNIT'
 [Unit]
-Description=FoxOps Linux Monitoring Agent
+Description=SparkeOPS Linux Monitoring Agent
 After=network-online.target
 Wants=network-online.target
 

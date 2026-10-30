@@ -82,9 +82,9 @@ def setup():
     os.chown('/usr/local/sbin/foxops-config', 0, 0)
     os.chmod('/usr/local/sbin/foxops-config', 0o755)
     rule = Path('/etc/sudoers.d/foxops-ssh')
-    if rule.exists() and 'FoxOps managed' not in rule.read_text():
-        raise RuntimeError('Arquivo sudoers existente não pertence ao FoxOps.')
-    rule.write_text('# FoxOps managed: validator accepts only fixed service operations\nfoxops-ssh ALL=(root) NOPASSWD: /usr/local/sbin/foxops-ssh-gateway *\n')
+    if rule.exists() and 'SparkeOPS managed' not in rule.read_text():
+        raise RuntimeError('Arquivo sudoers existente não pertence ao SparkeOPS.')
+    rule.write_text('# SparkeOPS managed: validator accepts only fixed service operations\nfoxops-ssh ALL=(root) NOPASSWD: /usr/local/sbin/foxops-ssh-gateway *\n')
     os.chmod(rule, 0o440)
     try:
         run(['/usr/sbin/visudo', '-cf', str(rule)])

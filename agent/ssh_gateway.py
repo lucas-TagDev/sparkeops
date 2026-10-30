@@ -63,7 +63,7 @@ def main():
         return 126
     args = allowed(command)
     if not args:
-        print('FoxOps: comando não autorizado.', file=sys.stderr)
+        print('SparkeOPS: comando não autorizado.', file=sys.stderr)
         return 126
     try:
         return subprocess.run(args, timeout=35, check=False, env={'PATH': '/usr/sbin:/usr/bin:/sbin:/bin', 'LANG': 'C'}).returncode

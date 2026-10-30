@@ -1,6 +1,6 @@
 # Identidade visual da plataforma
 
-Abra Configurações > Identidade visual da plataforma usando um administrador global autorizado. O formulário permite nome, logo, favicon e cor principal, com prévia local, confirmação, salvamento e restauração do padrão FoxOps. Salvar a prévia afeta todos os clientes, incluindo login, menu, rodapé, identificação do assistente e título/ícone da aba. Sessões abertas consultam a marca pública a cada minuto; uma atualização da página também a carrega. A troca de idioma preserva o nome personalizado e os arquivos.
+Abra Configurações > Identidade visual da plataforma usando um administrador global autorizado. O formulário permite nome, logo, favicon e cor principal, com prévia local, confirmação, salvamento e restauração do padrão SparkeOPS. Salvar a prévia afeta todos os clientes, incluindo login, menu, rodapé, identificação do assistente e título/ícone da aba. Sessões abertas consultam a marca pública a cada minuto; uma atualização da página também a carrega. A troca de idioma preserva o nome personalizado e os arquivos.
 
 ## Administradores globais
 
@@ -12,7 +12,7 @@ Neste ambiente local, a conta de testes qa@foxops.example foi explicitamente aut
 
 Logo: PNG, JPEG ou WebP. Favicon também aceita ICO. Até 512 KB por arquivo; SVG e URLs remotas são recusados. O backend valida o tipo declarado contra a assinatura dos bytes e limita PNG a 4096 pixels por lado. As imagens ficam armazenadas em platform_settings no SQLite e são publicadas somente como imagens nas rotas /branding/logo e /branding/favicon. O endpoint público /api/branding retorna nome, cor e URLs, nunca a lista de administradores. Nome e cor passam por validação; conteúdo é renderizado como texto, não HTML.
 
-A cor principal controla os destaques e os botões principais. A cor do texto dos botões é escolhida para contraste com o fundo; as cores técnicas de gráficos e estados de erro não são redefinidas. Nomes internos de serviços, rotas MCP, unidades do agente e comandos continuam usando identificadores técnicos FoxOps para compatibilidade. A personalização por cliente (white-label independente para cada conta), domínios próprios e emails transacionais não fazem parte desta configuração global.
+A cor principal controla os destaques e os botões principais. A cor do texto dos botões é escolhida para contraste com o fundo; as cores técnicas de gráficos e estados de erro não são redefinidas. Nomes internos de serviços, rotas MCP, unidades do agente e comandos continuam usando identificadores históricos `foxops` para compatibilidade. A personalização por cliente (white-label independente para cada conta), domínios próprios e emails transacionais não fazem parte desta configuração global.
 
 O backup do banco inclui a marca. Restaurar padrão remove a personalização global; o formulário pede confirmação. Não altera servidores, agentes, credenciais, assinaturas nem o histórico. Atualizações e restaurações entram na auditoria do administrador.
 

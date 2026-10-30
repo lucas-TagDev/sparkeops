@@ -630,7 +630,7 @@ def diagnose_service(service):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Agente de monitoramento FoxOps')
+    parser = argparse.ArgumentParser(description='Agente de monitoramento SparkeOPS')
     parser.add_argument('--config', default=os.environ.get('FOXOPS_CONFIG', ''))
     parser.add_argument('--enroll', action='store_true')
     parser.add_argument('--setup-ssh', action='store_true')

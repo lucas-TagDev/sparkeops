@@ -66,7 +66,7 @@ server.on("error", (error) => {
   process.exitCode = 1;
 });
 server.listen(port, host, () =>
-  console.log(`FoxOps: ${origin ?? `http://localhost:${port}`}`),
+  console.log(`SparkeOPS: ${origin ?? `http://localhost:${port}`}`),
 );
 for (const signal of ["SIGINT", "SIGTERM"] as const)
   process.on(signal, () => {

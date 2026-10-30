@@ -37,7 +37,7 @@ const version = JSON.parse(
 ).version;
 if (!/^\d+\.\d+\.\d+(?:-[a-zA-Z0-9.-]+)?$/.test(version))
   throw new Error("Versão inválida.");
-const name = `foxops-platform-${version}`;
+const name = `sparkeops-platform-${version}`;
 const output = join(root, "releases");
 mkdirSync(output, { recursive: true });
 const temp = mkdtempSync(join(tmpdir(), "foxops-release-"));

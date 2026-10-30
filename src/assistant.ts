@@ -195,10 +195,10 @@ export async function askAssistant(
                     .prepare(
                       "SELECT value FROM platform_settings WHERE key='branding'",
                     )
-                    .get()?.value ?? '{"name":"FoxOps"}',
+                    .get()?.value ?? '{"name":"SparkeOPS"}',
                 ),
               ).name
-            : "FoxOps",
+            : "SparkeOPS",
           question: data.question,
           historical_investigation: historical,
           scope: serverId ? "selected_server" : "all_servers",

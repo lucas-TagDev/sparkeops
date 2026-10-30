@@ -3,8 +3,8 @@
 Abra **Administração da plataforma → Pagamentos** como administrador geral.
 
 1. Abra **Suas integrações** no painel do Mercado Pago e selecione a aplicação da sua conta brasileira.
-2. Copie o **Access Token** para o campo correspondente no FoxOps.
-3. Configure as notificações da integração usando a **URL do webhook** exibida no FoxOps. Selecione pagamentos e planos/assinaturas, incluindo `payment`, `subscription_preapproval` e `subscription_authorized_payment`. Copie a chave de assinatura gerada para o campo **Chave de assinatura do webhook**.
+2. Copie o **Access Token** para o campo correspondente no SparkeOPS.
+3. Configure as notificações da integração usando a **URL do webhook** exibida no SparkeOPS. Selecione pagamentos e planos/assinaturas, incluindo `payment`, `subscription_preapproval` e `subscription_authorized_payment`. Copie a chave de assinatura gerada para o campo **Chave de assinatura do webhook**.
 4. Marque **Habilitar novas assinaturas pelo Mercado Pago**, clique em **Salvar credenciais** e depois em **Verificar credencial**. Essa verificação consulta a conta; não cria cobrança.
 5. Em **Planos e preços**, salve os valores em BRL e a periodicidade mensal ou anual. As novas assinaturas usam esses valores; a publicação de preços na Stripe pertence apenas à integração Stripe.
 

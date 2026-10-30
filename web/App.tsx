@@ -170,7 +170,7 @@ function Logo({ small = false }: { small?: boolean }) {
         </span>
       )}
       <span>
-        {branding.name === "FoxOps" ? (
+        {branding.name === "SparkeOPS" ? (
           <>
             fox<span className="brand-light">ops</span>
           </>

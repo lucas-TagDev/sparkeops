@@ -86,7 +86,7 @@ const nativeHop: Hop = (url, address, method, signal) =>
       signal,
       maxHeaderSize: 16384,
       ...(url.protocol === "https:" ? { rejectUnauthorized: true } : {}),
-      headers: { "User-Agent": "FoxOps-Uptime/1.0", Accept: "*/*" },
+      headers: { "User-Agent": "SparkeOPS-Uptime/1.0", Accept: "*/*" },
       lookup: (_host, options, callback) => {
         if (typeof options === "object" && options.all)
           callback(null, [

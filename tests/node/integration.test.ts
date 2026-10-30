@@ -336,7 +336,7 @@ test("HTTP: marca pública e alteração global isolada dos proprietários de cl
   const { request, url } = await fixture(t, {
     platformAdmins: ["platform@example.test"],
   });
-  assert.equal((await request("/api/branding")).data.name, "FoxOps");
+  assert.equal((await request("/api/branding")).data.name, "SparkeOPS");
   const admin = await request("/api/auth/signup", {
     name: "Global admin",
     company: "Platform",
@@ -405,7 +405,7 @@ test("HTTP: marca pública e alteração global isolada dos proprietários de cl
         "DELETE",
       )
     ).data.name,
-    "FoxOps",
+    "SparkeOPS",
   );
 });
 

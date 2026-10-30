@@ -6,7 +6,7 @@ export type Branding = {
   revision: string;
 };
 export const defaultBranding: Branding = {
-  name: "FoxOps",
+  name: "SparkeOPS",
   primaryColor: "#79e2af",
   logo: null,
   favicon: null,

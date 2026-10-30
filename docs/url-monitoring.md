@@ -10,7 +10,7 @@ O produto **Monitoramento de URLs** está incluído nos planos. O administrador 
 4. Escolha GET ou HEAD, intervalo (1 a 60 minutos), tempo limite (5 a 30 segundos), status HTTP esperado e quantidade de falhas consecutivas antes de alertar.
 5. Salve. A primeira coleta entra na fila automaticamente. **Verificar agora** inicia uma verificação imediata, respeitando o limite de frequência.
 
-As verificações partem da instalação FoxOps. Não exigem agente no site, navegador aberto ou chamadas de IA. A aplicação precisa continuar em execução. O processo agenda coletas e usa registros de execução no banco para impedir coletas duplicadas entre instâncias que compartilhem a mesma base. Sob carga, uma coleta pode começar depois do horário previsto.
+As verificações partem da instalação SparkeOPS. Não exigem agente no site, navegador aberto ou chamadas de IA. A aplicação precisa continuar em execução. O processo agenda coletas e usa registros de execução no banco para impedir coletas duplicadas entre instâncias que compartilhem a mesma base. Sob carga, uma coleta pode começar depois do horário previsto.
 
 ## Histórico e incidentes
 

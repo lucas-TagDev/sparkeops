@@ -13,7 +13,7 @@ SOURCE=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
 fail() { printf 'ERRO: %s\n' "$*" >&2; exit 1; }
 help() {
   cat <<'HELP'
-Instalador da plataforma SparkeOPS / FoxOps (Linux com systemd).
+Instalador da plataforma SparkeOPS (Linux com systemd).
 
 Produção (proxy HTTPS necessário):
   sudo bash deploy/install.sh --public-url https://monitor.exemplo.com --admin-email admin@exemplo.com

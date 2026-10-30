@@ -2,7 +2,7 @@
 
 ## Fluxo
 
-O agente no Linux envia métricas, estado de serviços e resumos de verificações locais de logs. A aplicação Node.js inicia as conexões SSH usadas para ações de correção. A credencial SSH não é enviada para o agente nem para a IA. A conexão sai da máquina onde o FoxOps está rodando em direção à porta SSH do Ubuntu.
+O agente no Linux envia métricas, estado de serviços e resumos de verificações locais de logs. A aplicação Node.js inicia as conexões SSH usadas para ações de correção. A credencial SSH não é enviada para o agente nem para a IA. A conexão sai da máquina onde o SparkeOPS está rodando em direção à porta SSH do Ubuntu.
 
 Nos detalhes do servidor há o painel **Serviços, logs e correções**, com abas Serviços, Logs e IA, Conexão SSH e Ações e aprovações. A coleta continua independente da IA.
 
@@ -78,7 +78,7 @@ Os comandos são templates fixos no backend. Nginx, Apache e PHP-FPM passam por 
 
 As propostas expiram em 15 minutos e deixam de valer se a conexão SSH for alterada. Só uma ação pode executar por servidor. A mesma proposta não pode ser aprovada duas vezes. Resultados, aprovador e auditoria são armazenados. Se a conexão cair, houver timeout ou a aplicação reiniciar durante a execução, o resultado é indeterminado: verifique o serviço antes de repetir. Não há repetição automática de uma ação.
 
-MCP inclui request_local_log_check (solicita leitura no host), get_local_log_checks e get_service_logs (resumos locais), além de propose_service_action (somente proposta). A aprovação e execução não são expostas pelo MCP. Não é necessário expor uma porta MCP no Ubuntu: o MCP do FoxOps encaminha a solicitação ao agente pela resposta da coleta autenticada.
+MCP inclui request_local_log_check (solicita leitura no host), get_local_log_checks e get_service_logs (resumos locais), além de propose_service_action (somente proposta). A aprovação e execução não são expostas pelo MCP. Não é necessário expor uma porta MCP no Ubuntu: o MCP do SparkeOPS encaminha a solicitação ao agente pela resposta da coleta autenticada.
 
 ## Validação
 
@@ -104,7 +104,7 @@ A aba **Configurações de serviços** lê parâmetros pelo SSH, permite valores
 
 Perfis iniciais: Nginx `/etc/nginx/nginx.conf` (worker_processes, incluindo substituir auto por um número), Apache `/etc/apache2/apache2.conf` (Timeout e KeepAliveTimeout), PHP-FPM `/etc/php/VERSAO/fpm/pool.d/www.conf` (pm.max_children e pm.max_requests, seção www) e MySQL `/etc/mysql/mysql.conf.d/mysqld.cnf` (max_connections, seção mysqld). As diretivas precisam existir uma única vez, ativas e no formato reconhecido. Não há inclusão de seções, parâmetros arbitrários, edição de paths personalizados ou diagnóstico SQL. MariaDB e PostgreSQL não têm perfil de edição nesta versão.
 
-O auxiliar exige arquivo root, sem links simbólicos ou escrita por grupo/outros, e diretórios seguros. Uma hash impede aplicar sobre um arquivo alterado desde a leitura. Há bloqueio local entre operações FoxOps. Edições externas não participam do bloqueio; evite alterar o arquivo manualmente enquanto uma proposta é aplicada.
+O auxiliar exige arquivo root, sem links simbólicos ou escrita por grupo/outros, e diretórios seguros. Uma hash impede aplicar sobre um arquivo alterado desde a leitura. Há bloqueio local entre operações SparkeOPS. Edições externas não participam do bloqueio; evite alterar o arquivo manualmente enquanto uma proposta é aplicada.
 
 Na aprovação, o auxiliar valida a configuração atual, salva backup root 0600 em `/var/lib/foxops-config/backups`, escreve atomicamente, valida e recarrega o serviço. MySQL usa `mysqld --validate-config` e reinício: pode interromper conexões. Validador indisponível ou configuração inicial inválida recusam a operação sem alterar o arquivo. Este fluxo ajusta parâmetros numéricos; não repara erros arbitrários de sintaxe.
 
@@ -140,7 +140,7 @@ Referências oficiais: https://developers.cloudflare.com/tunnel/reference/tunnel
 
 O chat agora oferece o modo **Investigar usando comandos SSH**, habilitado na interface para contas com IA configurada e perfil com permissão de preparar ações. A IA pode propor comandos fora do catálogo MCP: ler portas, inspecionar discos, descobrir arquivos de configuração e consultar parâmetros. O usuário recebe o comando completo e a justificativa. Somente proprietário/administrador pode aprovar. A ferramenta não executa nada na fase de planejamento. Após a aprovação, executa exatamente a proposta vinculada ao servidor/conexão e devolve a saída para uma nova etapa de análise. Cada próximo comando exige outra aprovação. Há limite de cinco etapas por investigação, 30 segundos por comando e saída limitada a 16 KB. Timeout e limite de saída deixam resultado indeterminado e interrompem a continuação automática. Comandos podem ter efeitos antes de falhar: nunca repita sem conferir.
 
-O catálogo de monitoramento continua disponível ao desmarcar esse modo. O modo genérico é administrativo e não é um sandbox: depois de habilitado no host, a chave SSH dedicada pode executar comandos root por esse caminho. A aprovação é aplicada pelo backend FoxOps; proteja o servidor do painel e a credencial SSH. O administrador do Ubuntu precisa habilitar explicitamente a extensão com `bash /tmp/foxops-upgrade.sh --enable-approved-commands`, depois de baixar novamente o atualizador. Atualizações normais não habilitam essa permissão. Para revogar, execute o atualizador com --disable-approved-commands. Isso preserva monitoramento e os templates anteriores.
+O catálogo de monitoramento continua disponível ao desmarcar esse modo. O modo genérico é administrativo e não é um sandbox: depois de habilitado no host, a chave SSH dedicada pode executar comandos root por esse caminho. A aprovação é aplicada pelo backend SparkeOPS; proteja o servidor do painel e a credencial SSH. O administrador do Ubuntu precisa habilitar explicitamente a extensão com `bash /tmp/foxops-upgrade.sh --enable-approved-commands`, depois de baixar novamente o atualizador. Atualizações normais não habilitam essa permissão. Para revogar, execute o atualizador com --disable-approved-commands. Isso preserva monitoramento e os templates anteriores.
 
 No modo genérico não existe garantia automática de backup ou rollback para qualquer comando. Esses recursos continuam disponíveis no editor restrito de configurações. A IA é instruída a investigar antes de alterar e a não tratar um pedido de diagnóstico como autorização de correção. Um aumento de disco exige identificar dispositivo, partições, filesystem, LVM e espaço subjacente e pode depender do provedor da VM; a IA não pode presumir que um comando SSH cria capacidade física ou de nuvem.
 

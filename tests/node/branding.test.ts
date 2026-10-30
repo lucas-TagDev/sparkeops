@@ -37,7 +37,7 @@ test("marca global: somente administrador explicitamente configurado pode editar
     ),
   );
   const original = brand.public();
-  assert.equal(original.name, "FoxOps");
+  assert.equal(original.name, "SparkeOPS");
   const result = brand.save(a, {
     name: "Minha Plataforma",
     primaryColor: "#2244aa",
@@ -60,7 +60,7 @@ test("marca global: somente administrador explicitamente configurado pode editar
   assert.equal(brand.asset("logo"), null);
   assert.ok(brand.asset("favicon"));
   const restored = brand.reset(a);
-  assert.equal(restored.name, "FoxOps");
+  assert.equal(restored.name, "SparkeOPS");
   assert.equal(restored.logo, null);
   assert.equal(restored.primaryColor, "#79e2af");
   assert.ok(
