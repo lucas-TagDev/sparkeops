@@ -145,3 +145,12 @@ O catálogo de monitoramento continua disponível ao desmarcar esse modo. O modo
 No modo genérico não existe garantia automática de backup ou rollback para qualquer comando. Esses recursos continuam disponíveis no editor restrito de configurações. A IA é instruída a investigar antes de alterar e a não tratar um pedido de diagnóstico como autorização de correção. Um aumento de disco exige identificar dispositivo, partições, filesystem, LVM e espaço subjacente e pode depender do provedor da VM; a IA não pode presumir que um comando SSH cria capacidade física ou de nuvem.
 
 A saída aprovada é enviada ao provedor da conta para análise. Não aprove comandos que exibam credenciais, chaves privadas, ambientes completos ou dados sensíveis. Há máscara de padrões comuns, mas ela não garante remoção de todos os segredos. Os comandos e os resultados ficam registrados nas ações e no histórico do chat. Não há execução automática de comandos novos sem aprovação nesta versão.
+
+
+## Instalação do agente atrás da Cloudflare
+
+O agente 0.11.2 identifica suas chamadas como `SparkeOPS-Agent`, incluindo inscrição, métricas, verificações e cadastro SSH. O identificador genérico Python-urllib pode ser bloqueado pela Cloudflare antes de a requisição chegar à API (erro 1010 / HTTP 403).
+
+Esse bloqueio não comprova que o token venceu. O agente distingue bloqueios do proxy, erros de assinatura e token inválido. Atualize a plataforma com `git pull --ff-only` e `sudo bash deploy/install.sh` para servir o agente corrigido; depois baixe e execute novamente o instalador do agente na máquina monitorada. Use um token temporário ainda válido, digitado somente no terminal.
+
+Se uma regra adicional de segurança ainda bloquear a API, revise os eventos da Cloudflare e faça uma exceção específica para as rotas de comunicação do agente, sem desabilitar a proteção global dos formulários. Referência: [erro 1010 da Cloudflare](https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-1xxx-errors/error-1010/).

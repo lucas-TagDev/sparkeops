@@ -21,6 +21,39 @@ from types import SimpleNamespace
 from urllib.parse import urlparse
 
 
+AGENT_VERSION = '0.11.2'
+
+
+def platform_request(url, data=None, headers=None):
+    return urllib.request.Request(url, data=data, headers={
+        'User-Agent': 'SparkeOPS-Agent/' + AGENT_VERSION,
+        'Accept': 'application/json',
+        **(headers or {}),
+    })
+
+
+def http_failure(error, phase='Instalação'):
+    try:
+        raw = error.read(4096).decode('utf-8', 'replace')
+    except OSError:
+        raw = ''
+    finally:
+        error.close()
+    headers = error.headers or {}
+    prefix = f'{phase} recusada: HTTP {error.code}. '
+    if error.code == 403 and (headers.get('cf-mitigated') == 'challenge' or 'error code: 1010' in raw.lower() or ('cloudflare' in headers.get('Server', '').lower() and 'application/json' not in headers.get('Content-Type', '').lower())):
+        return prefix + 'Bloqueio da Cloudflare. Verifique as regras de segurança para as rotas do agente; isso não confirma token inválido.'
+    if error.code == 401:
+        return prefix + ('Token expirado ou já utilizado. Gere outro token temporário no painel.' if phase == 'Instalação' else 'Credencial inválida ou revogada. Registre o agente novamente.')
+    if error.code == 403:
+        return prefix + 'Verifique PUBLIC_URL, o proxy e as permissões da API. Isso não confirma token inválido.'
+    if error.code == 402:
+        return prefix + 'Assinatura inativa. Consulte o plano da conta.'
+    if error.code == 429:
+        return prefix + 'Limite de tentativas atingido. Aguarde antes de tentar novamente.'
+    return prefix + 'Consulte os logs da plataforma para identificar a causa.'
+
+
 def cpu_ticks():
     values = [int(x) for x in Path('/proc/stat').read_text().splitlines()[0].split()[1:9]]
     return sum(values), values[3] + values[4]
@@ -574,7 +607,7 @@ def live_diagnostic(job, config):
             for origin in origins:
                 try:
                     opener=urllib.request.build_opener(urllib.request.ProxyHandler({}),NoRedirect())
-                    with opener.open(urllib.request.Request(origin,method='HEAD'),timeout=4) as response:
+                    with opener.open(urllib.request.Request(origin,method='HEAD',headers={'User-Agent':'SparkeOPS-Agent/'+AGENT_VERSION}),timeout=4) as response:
                         test={'status':'responded','http_status':response.status}
                 except urllib.error.HTTPError as error:
                     test={'status':'http_error','http_status':error.code}
@@ -603,7 +636,7 @@ def details(services, discovered=None):
         states = {service: loaded.get(service.removesuffix('.service'), 'not_loaded' if result.returncode==0 else 'unknown') for service in services[:1000] if re.fullmatch(r'[a-zA-Z0-9][a-zA-Z0-9_.@-]{0,99}', service)}
     except (OSError, subprocess.TimeoutExpired):
         states = {service:'unknown' for service in services[:1000]}
-    return {'agent_version': '0.11.1', 'telemetry': collect_telemetry(), 'discovery_limit_reached': len(discovered or services)>=1000, 'discovered_services': discovered if discovered is not None else services, 'hostname': socket.gethostname(), 'os': platform.platform(),
+    return {'agent_version': AGENT_VERSION, 'telemetry': collect_telemetry(), 'discovery_limit_reached': len(discovered or services)>=1000, 'discovered_services': discovered if discovered is not None else services, 'hostname': socket.gethostname(), 'os': platform.platform(),
             'uptime_seconds': int(float(Path('/proc/uptime').read_text().split()[0])),
             'network_rx_bytes': rx, 'network_tx_bytes': tx, 'services': states}
 
@@ -650,13 +683,13 @@ def main():
         if not args.config:
             raise SystemExit('Informe --config para armazenar a credencial individual.')
         enrollment = getpass.getpass('Token temporário de instalação: ')
-        request = urllib.request.Request(endpoint + '/api/agent/enroll',
+        request = platform_request(endpoint + '/api/agent/enroll',
             data=json.dumps({'token': enrollment, 'setup_ssh': args.setup_ssh}).encode(), headers={'Content-Type': 'application/json'})
         try:
             with urllib.request.urlopen(request, timeout=15) as response:
                 result = json.load(response)
         except urllib.error.HTTPError as exc:
-            raise SystemExit(f'Instalação recusada: HTTP {exc.code}. Gere outro token no painel.') from None
+            raise SystemExit(http_failure(exc)) from None
         config = {'endpoint': endpoint, 'token': result['agent_token'], 'services': config.get('services', []), 'allow_lan_http': allow_lan_http}
         if result.get('ssh_bootstrap'):
             config['ssh_bootstrap_ticket'] = result['ssh_bootstrap']['ticket']
@@ -684,7 +717,7 @@ def main():
             info['service_alert_mode'] = 'failed_only' if monitor.get('auto_discover', True) else 'all_inactive'
             info['log_error'] = log_error
             pending = json.dumps({'event_id': str(uuid.uuid4()), 'metrics': collect(), 'details': info}).encode()
-        request = urllib.request.Request(endpoint + '/api/metrics', data=pending,
+        request = platform_request(endpoint + '/api/metrics', data=pending,
             headers={'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json'})
         try:
             with urllib.request.urlopen(request, timeout=15) as response:
@@ -693,14 +726,14 @@ def main():
             for job in result.get('live_checks', [])[:1]:
                 try:
                     summary=live_diagnostic(job,config)
-                    live_request=urllib.request.Request(endpoint+'/api/agent/live-checks/'+str(uuid.UUID(job['id'])),data=json.dumps(summary).encode(),headers={'Authorization':'Bearer '+token,'Content-Type':'application/json'})
+                    live_request=platform_request(endpoint+'/api/agent/live-checks/'+str(uuid.UUID(job['id'])),data=json.dumps(summary).encode(),headers={'Authorization':'Bearer '+token,'Content-Type':'application/json'})
                     with urllib.request.urlopen(live_request,timeout=15) as response:response.read()
                 except (OSError,ValueError,KeyError):
                     log_error='Diagnóstico do chat não confirmado; nova tentativa no próximo ciclo.'
             if result.get('process_monitors'):
                 try:
                     watched = monitor_processes(result['process_monitors'])
-                    watch_request = urllib.request.Request(endpoint + '/api/agent/process-watch', data=json.dumps({'event_id': str(uuid.uuid4()), 'collected_at': time.time(), 'results': watched}).encode(), headers={'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json'})
+                    watch_request = platform_request(endpoint + '/api/agent/process-watch', data=json.dumps({'event_id': str(uuid.uuid4()), 'collected_at': time.time(), 'results': watched}).encode(), headers={'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json'})
                     with urllib.request.urlopen(watch_request, timeout=15) as response:
                         response.read()
                 except (OSError, ValueError, KeyError):
@@ -708,7 +741,7 @@ def main():
             for job in result.get('process_checks', [])[:1]:
                 try:
                     summary = collect_processes()
-                    process_request = urllib.request.Request(endpoint + '/api/agent/processes/' + str(uuid.UUID(job['id'])), data=json.dumps(summary).encode(), headers={'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json'})
+                    process_request = platform_request(endpoint + '/api/agent/processes/' + str(uuid.UUID(job['id'])), data=json.dumps(summary).encode(), headers={'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json'})
                     with urllib.request.urlopen(process_request, timeout=15) as response:
                         response.read()
                 except (OSError, ValueError, KeyError):
@@ -716,7 +749,7 @@ def main():
             for job in result.get('log_checks', [])[:1]:
                 try:
                     summary = check_local_logs(job)
-                    check_request = urllib.request.Request(endpoint + '/api/agent/log-checks/' + str(uuid.UUID(job['id'])), data=json.dumps(summary).encode(), headers={'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json'})
+                    check_request = platform_request(endpoint + '/api/agent/log-checks/' + str(uuid.UUID(job['id'])), data=json.dumps(summary).encode(), headers={'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json'})
                     with urllib.request.urlopen(check_request, timeout=15) as response:
                         response.read()
                 except (OSError, ValueError, KeyError):
@@ -727,7 +760,7 @@ def main():
                 while entries and len(json.dumps({'entries': entries}).encode()) > 27000:
                     entries.pop()
                 if entries:
-                    log_request = urllib.request.Request(endpoint + '/api/agent/logs', data=json.dumps({'entries': entries}).encode(), headers={'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json'})
+                    log_request = platform_request(endpoint + '/api/agent/logs', data=json.dumps({'entries': entries}).encode(), headers={'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json'})
                     try:
                         with urllib.request.urlopen(log_request, timeout=15) as response:
                             response.read()
@@ -737,8 +770,8 @@ def main():
             pending = None
             failures = 0
         except urllib.error.HTTPError as exc:
-            print(f'Coleta recusada: HTTP {exc.code}', flush=True)
-            if exc.code in (401, 403):
+            print(http_failure(exc, 'Coleta'), flush=True)
+            if exc.code == 401:
                 raise SystemExit('Credencial inválida ou revogada. Registre o agente novamente.') from None
             failures += 1
         except (OSError, urllib.error.URLError):

@@ -10,6 +10,23 @@ spec.loader.exec_module(agent)
 
 
 class LinuxAgentTests(unittest.TestCase):
+    def test_platform_requests_identify_the_agent_and_preserve_authentication(self):
+        request = agent.platform_request('https://platform.example/api/metrics', data=b'{}', headers={'Authorization': 'Bearer TEST_ONLY'})
+        self.assertEqual(request.get_header('User-agent'), 'SparkeOPS-Agent/' + agent.AGENT_VERSION)
+        self.assertEqual(request.get_header('Authorization'), 'Bearer TEST_ONLY')
+        self.assertEqual(request.get_header('Accept'), 'application/json')
+
+    def test_cloudflare_403_is_not_reported_as_an_invalid_token(self):
+        import io
+        error = agent.urllib.error.HTTPError('https://platform.example/api/agent/enroll', 403, 'Forbidden', {'Server': 'cloudflare'}, io.BytesIO(b'error code: 1010'))
+        message = agent.http_failure(error)
+        self.assertIn('Cloudflare', message)
+        self.assertNotIn('Gere outro', message)
+        error = agent.urllib.error.HTTPError('https://platform.example/api/agent/enroll', 403, 'Forbidden', {'Server': 'cloudflare', 'Content-Type': 'application/json'}, io.BytesIO(b'{"error":"Host not allowed"}'))
+        self.assertIn('PUBLIC_URL', agent.http_failure(error))
+        error = agent.urllib.error.HTTPError('https://platform.example/api/agent/enroll', 401, 'Unauthorized', {}, io.BytesIO(b'{}'))
+        self.assertIn('Gere outro token', agent.http_failure(error))
+
     def test_live_service_diagnosis_is_scoped_and_redacts_error_samples(self):
         raw='{"MESSAGE":"Start request repeated too quickly token=secret_value","PRIORITY":"3"}\n'
         with patch.object(agent,'inspect_service_runtime',return_value={'my-app':{'Result':'start-limit-hit'}}),patch.object(agent,'check_local_logs',return_value={'counts':{'other_errors':1}}),patch.object(agent,'run_journal',return_value=SimpleNamespace(stdout=raw,stderr='',returncode=0,truncated=False)) as journal:

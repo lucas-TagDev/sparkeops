@@ -104,7 +104,7 @@ def setup():
     os.chmod(authorized, 0o644)
     try:
         payload = {'ticket': ticket, 'host': host, 'port': port, 'username': 'foxops-ssh', 'fingerprint': fp, 'privateKey': key.read_text()}
-        req = urllib.request.Request(config['endpoint'].rstrip('/') + '/api/agent/ssh-bootstrap', data=json.dumps(payload).encode(), headers={'Authorization': 'Bearer ' + config['token'], 'Content-Type': 'application/json'})
+        req = urllib.request.Request(config['endpoint'].rstrip('/') + '/api/agent/ssh-bootstrap', data=json.dumps(payload).encode(), headers={'Authorization': 'Bearer ' + config['token'], 'Content-Type': 'application/json', 'User-Agent': 'SparkeOPS-SSH-Setup/0.11.2', 'Accept': 'application/json'})
         with urllib.request.urlopen(req, timeout=20) as response:
             response.read()
     except Exception:
