@@ -580,6 +580,19 @@ export function createApp(
     runbooks.reject(p(res), String(req.params.id), String(req.params.run));
     res.json({ ok: true });
   });
+  app.get("/api/v1/platform/ai/endpoints", (_req, res) => {
+    administration.authorize(p(res));
+    res.json({ origins: aiSettings.endpoints.origins() });
+  });
+  app.put("/api/v1/platform/ai/endpoints", (req, res) => {
+    administration.authorize(p(res));
+    const result = platform.transaction(() => {
+      const result = aiSettings.endpoints.save(body(req).origins);
+      platform.audit(p(res), "platform.ai.endpoints.updated");
+      return result;
+    });
+    res.json(result);
+  });
   app.get("/api/v1/platform/security/turnstile", (_req, res) =>
     res.json(turnstile.metadata(p(res))),
   );

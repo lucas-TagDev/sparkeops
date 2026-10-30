@@ -2152,7 +2152,7 @@ function Assistant({
           {branding.name} {tx("Assistente")}{" "}
           <span className="tag">
             {selectedAIAvailable && mode !== "diagnostic"
-              ? tx`${({ openai: "OpenAI", claude: "Claude", grok: "Grok", deepseek: "DeepSeek", gemini: "Gemini" } as Record<string, string>)[mode === "auto" ? (config.ai_provider ?? "openai") : mode === "platform" ? "openai" : mode]} conectada`
+              ? tx`${({ openai: "OpenAI", claude: "Claude", grok: "Grok", deepseek: "DeepSeek", gemini: "Gemini", compatible: "API compatível / Local" } as Record<string, string>)[mode === "auto" ? (config.ai_provider ?? "openai") : mode === "platform" ? "openai" : mode]} conectada`
               : tx("Diagnóstico básico")}
           </span>
         </h2>
@@ -2166,7 +2166,7 @@ function Assistant({
             <option value="auto">{tx("Usar IA configurada")}</option>
             {aiChoices.providers.map((provider) => (
               <option key={provider.id} value={provider.id}>
-                {provider.name} · {provider.model}
+                {tx(provider.name)} · {provider.model}
               </option>
             ))}
             {aiChoices.platform_available && (

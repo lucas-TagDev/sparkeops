@@ -124,3 +124,8 @@ Configure o **Cloudflare Turnstile** em **Administração da plataforma → Segu
 ## Desinstalar
 
 No Linux, execute `sudo bash deploy/uninstall.sh` para remover programa e serviços preservando os dados. Use `--dry-run` para simular ou `--purge-data` para remover também os dados, com confirmação obrigatória. Veja os detalhes no [guia Linux](docs/instalacao-linux.md#remover-a-instalação).
+
+
+## Modelos locais e APIs compatíveis
+
+Use **API compatível / Local** nas configurações de IA para conectar LM Studio e serviços compatíveis com Chat Completions. O administrador geral autoriza o destino em **Endpoints de IA**; o proprietário informa URL base, modelo e chave opcional. Veja o [guia de LLM local](docs/llm-local.md).

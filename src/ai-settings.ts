@@ -1,3 +1,4 @@
+import { AIEndpointPolicy } from "./ai-endpoints.ts";
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
@@ -13,6 +14,8 @@ export type VaultOptions = {
   fetch?: typeof fetch;
 };
 type Row = {
+  base_url: string | null;
+  no_key: number;
   provider: Provider;
   model: string;
   encrypted_key: string;
@@ -29,14 +32,27 @@ type Preference = {
 export class AISettings {
   platform: Platform;
   options: VaultOptions;
+  endpoints: AIEndpointPolicy;
   constructor(platform: Platform, options: VaultOptions = {}) {
     this.platform = platform;
     this.options = options;
+    this.endpoints = new AIEndpointPolicy(platform);
     platform.store.db.exec(`CREATE TABLE IF NOT EXISTS ai_credentials (
       tenant_id TEXT NOT NULL REFERENCES tenants(id), provider TEXT NOT NULL, model TEXT NOT NULL,
       encrypted_key TEXT NOT NULL, enabled INTEGER NOT NULL DEFAULT 1, updated_at INTEGER NOT NULL,
       tested_at INTEGER, test_ok INTEGER, PRIMARY KEY(tenant_id,provider));
       CREATE TABLE IF NOT EXISTS ai_preferences(tenant_id TEXT PRIMARY KEY REFERENCES tenants(id),mode TEXT NOT NULL,provider TEXT);`);
+    const columns = platform.store.db
+      .prepare("PRAGMA table_info(ai_credentials)")
+      .all();
+    if (!columns.some((column) => column.name === "base_url"))
+      platform.store.db.exec(
+        "ALTER TABLE ai_credentials ADD COLUMN base_url TEXT",
+      );
+    if (!columns.some((column) => column.name === "no_key"))
+      platform.store.db.exec(
+        "ALTER TABLE ai_credentials ADD COLUMN no_key INTEGER NOT NULL DEFAULT 0",
+      );
   }
   private key(create = false) {
     if (this.options.masterKey) {
@@ -205,6 +221,8 @@ export class AISettings {
           configured: !!row,
           enabled: !!row?.enabled,
           model: row?.model ?? "",
+          base_url: row?.base_url ?? "",
+          no_key: !!row?.no_key,
           updated_at: row?.updated_at ?? null,
           tested_at: row?.tested_at ?? null,
           test_ok:
@@ -232,11 +250,24 @@ export class AISettings {
       .trim()
       .replace(provider === "gemini" ? /^models\// : /^$/, "");
     const existing = this.row(p.tenantId, provider);
+    const baseUrl =
+      provider === "compatible" ? this.endpoints.allowed(data.base_url) : null;
+    const noKey = provider === "compatible" && data.no_key === true;
+    if (
+      provider === "compatible" &&
+      (existing?.no_key || !existing) &&
+      data.no_key === false &&
+      !data.key
+    )
+      throw new APIError(
+        400,
+        "Informe a chave ou mantenha a opção sem chave habilitada.",
+      );
     let encrypted = existing?.encrypted_key;
     if (data.key !== undefined && data.key !== "") {
       if (
         typeof data.key !== "string" ||
-        data.key.trim().length < 8 ||
+        data.key.trim().length < (provider === "compatible" ? 1 : 8) ||
         data.key.trim().length > 4096 ||
         /\s/.test(data.key.trim())
       )
@@ -246,6 +277,8 @@ export class AISettings {
         );
       encrypted = this.seal(p.tenantId, provider, data.key.trim());
     }
+    if (noKey || (provider === "compatible" && !encrypted && !data.key))
+      encrypted = this.seal(p.tenantId, provider, "");
     if (!encrypted)
       throw new APIError(400, "Cadastre a chave de API deste provedor.");
     const preferenceExists = !!this.platform.store.db
@@ -254,8 +287,8 @@ export class AISettings {
     this.platform.transaction(() => {
       this.platform.store.db
         .prepare(
-          `INSERT INTO ai_credentials VALUES (?,?,?,?,?,?,NULL,NULL) ON CONFLICT(tenant_id,provider)
-        DO UPDATE SET model=excluded.model,encrypted_key=excluded.encrypted_key,enabled=excluded.enabled,updated_at=excluded.updated_at,tested_at=NULL,test_ok=NULL`,
+          `INSERT INTO ai_credentials (tenant_id,provider,model,encrypted_key,enabled,updated_at,tested_at,test_ok,base_url,no_key) VALUES (?,?,?,?,?,?,NULL,NULL,?,?) ON CONFLICT(tenant_id,provider)
+        DO UPDATE SET model=excluded.model,encrypted_key=excluded.encrypted_key,enabled=excluded.enabled,updated_at=excluded.updated_at,tested_at=NULL,test_ok=NULL,base_url=excluded.base_url,no_key=excluded.no_key`,
         )
         .run(
           p.tenantId,
@@ -264,6 +297,10 @@ export class AISettings {
           encrypted!,
           data.enabled ? 1 : 0,
           now(),
+          baseUrl,
+          noKey || (provider === "compatible" && !existing && !data.key)
+            ? 1
+            : 0,
         );
       if (data.enabled && !preferenceExists)
         this.platform.store.db
@@ -356,6 +393,9 @@ export class AISettings {
         "IA selecionada indisponível. Configure e habilite o provedor nas configurações.",
       );
     return {
+      ...(id === "compatible"
+        ? { baseUrl: this.endpoints.allowed(row.base_url) }
+        : {}),
       provider: id,
       model: row.model,
       key: this.unseal(p.tenantId, id, row.encrypted_key),
@@ -379,6 +419,9 @@ export class AISettings {
       : undefined;
     if (!row?.enabled) return null;
     return {
+      ...(row.provider === "compatible"
+        ? { baseUrl: this.endpoints.allowed(row.base_url) }
+        : {}),
       provider: row.provider,
       model: row.model,
       key: this.unseal(p.tenantId, row.provider, row.encrypted_key),
@@ -393,6 +436,9 @@ export class AISettings {
     try {
       const result = await testProvider(
         {
+          ...(provider === "compatible"
+            ? { baseUrl: this.endpoints.allowed(row.base_url) }
+            : {}),
           provider,
           model: row.model,
           key: this.unseal(p.tenantId, provider, row.encrypted_key),

@@ -1,3 +1,4 @@
+import { AIEndpointPolicyPanel } from "./AIEndpointPolicyPanel.tsx";
 import { TurnstileSettingsPanel } from "./TurnstileSettingsPanel.tsx";
 import { BrandingPanel } from "./BrandingPanel.tsx";
 import { PlatformEmailPanel } from "./PlatformEmailPanel.tsx";
@@ -30,6 +31,13 @@ export function PlatformAdminPanel({ userId }: { userId: string }) {
         role="tablist"
         aria-label={t("Administração da plataforma")}
       >
+        <button
+          role="tab"
+          aria-selected={section === "ai-endpoints"}
+          onClick={() => setSection("ai-endpoints")}
+        >
+          {t("Endpoints de IA")}
+        </button>
         <button
           role="tab"
           aria-selected={section === "security"}
@@ -80,7 +88,9 @@ export function PlatformAdminPanel({ userId }: { userId: string }) {
           {t("Pagamentos")}
         </button>
       </div>
-      {section === "security" ? (
+      {section === "ai-endpoints" ? (
+        <AIEndpointPolicyPanel />
+      ) : section === "security" ? (
         <TurnstileSettingsPanel />
       ) : section === "branding" ? (
         <BrandingPanel />

@@ -216,8 +216,12 @@ test("campos inválidos não são persistidos e tokens não entram na auditoria"
 });
 
 for (const provider of Object.keys(PROVIDERS) as Provider[]) {
-  test(`${provider}: adaptador usa URL fixa, autenticação correta e extrai resposta e consumo`, async () => {
+  test(`${provider}: adaptador usa URL esperada, autenticação correta e extrai resposta e consumo`, async () => {
     const responses = {
+      compatible: {
+        choices: [{ message: { content: "Resposta" } }],
+        usage: { total_tokens: 12 },
+      },
       openai: {
         output: [{ content: [{ type: "output_text", text: "Resposta" }] }],
         usage: { total_tokens: 12 },
@@ -246,6 +250,7 @@ for (const provider of Object.keys(PROVIDERS) as Provider[]) {
       },
     };
     const hosts = {
+      compatible: "llm.example.test",
       openai: "api.openai.com",
       claude: "api.anthropic.com",
       grok: "api.x.ai",
@@ -275,7 +280,14 @@ for (const provider of Object.keys(PROVIDERS) as Provider[]) {
     }) as typeof fetch;
     assert.deepEqual(
       await generate(
-        { provider, key: fakeKey, model: "test-model" },
+        {
+          provider,
+          key: fakeKey,
+          model: "test-model",
+          ...(provider === "compatible"
+            ? { baseUrl: "https://llm.example.test/v1" }
+            : {}),
+        },
         "system",
         "authorized-snapshot",
         fetcher,
@@ -297,7 +309,14 @@ for (const provider of Object.keys(PROVIDERS) as Provider[]) {
       );
     }) as typeof fetch;
     const result = await testProvider(
-      { provider, key: fakeKey, model: "test-model" },
+      {
+        provider,
+        key: fakeKey,
+        model: "test-model",
+        ...(provider === "compatible"
+          ? { baseUrl: "https://llm.example.test/v1" }
+          : {}),
+      },
       fetcher,
     );
     assert.equal(result.ok, true);

@@ -26,6 +26,8 @@ type Provider = {
   configured: boolean;
   enabled: boolean;
   model: string;
+  base_url: string;
+  no_key: boolean;
   updated_at: number | null;
   tested_at: number | null;
   test_ok: boolean | null;
@@ -283,6 +285,13 @@ function ProviderCard({
   busy: boolean;
   action: (fn: () => Promise<unknown>, success: string) => Promise<void>;
 }) {
+  const compatible = provider.id === "compatible";
+  const [baseUrl, setBaseUrl] = useState(
+      provider.base_url || "http://127.0.0.1:1234/v1",
+    ),
+    [noKey, setNoKey] = useState(
+      provider.configured ? provider.no_key : compatible,
+    );
   const [key, setKey] = useState(""),
     [model, setModel] = useState(provider.model),
     [enabled, setEnabled] = useState(
@@ -291,7 +300,11 @@ function ProviderCard({
     [models, setModels] = useState<string[]>([]),
     [testMessage, setTestMessage] = useState("");
   const dirty =
-    !!key || model !== provider.model || enabled !== provider.enabled;
+    !!key ||
+    model !== provider.model ||
+    enabled !== provider.enabled ||
+    (compatible &&
+      (baseUrl !== provider.base_url || noKey !== provider.no_key));
   const examples = MODEL_EXAMPLES[provider.id];
   const symbols: Record<string, string> = {
     openai: "O",
@@ -299,6 +312,7 @@ function ProviderCard({
     grok: "X",
     deepseek: "D",
     gemini: "G",
+    compatible: "L",
   };
   return (
     <form
@@ -309,7 +323,12 @@ function ProviderCard({
           async () => {
             await api(
               "/ai/providers/" + provider.id,
-              { key: key || undefined, model, enabled },
+              {
+                key: key || undefined,
+                model,
+                enabled,
+                ...(compatible ? { base_url: baseUrl, no_key: noKey } : {}),
+              },
               "PUT",
             );
             setKey("");
@@ -324,7 +343,7 @@ function ProviderCard({
           {symbols[provider.id]}
         </span>
         <div>
-          <h3>{provider.name}</h3>
+          <h3>{tx(provider.name)}</h3>
           <small>{tx(provider.description)}</small>
         </div>
         {active ? (
@@ -342,6 +361,39 @@ function ProviderCard({
           </span>
         )}
       </div>
+      {compatible && (
+        <>
+          <label>
+            {tx("Endereço base da API")}
+            <input
+              type="url"
+              required
+              value={baseUrl}
+              disabled={!manage || busy}
+              maxLength={500}
+              onChange={(e) => setBaseUrl(e.target.value)}
+              placeholder="http://192.168.3.50:1234/v1"
+            />
+          </label>
+          <p className="muted">
+            {tx(
+              "Use a URL acessível pelo servidor SparkeOPS, incluindo /v1 quando exigido. localhost aponta para a máquina da plataforma. O destino deve ser autorizado pelo administrador geral em Endpoints de IA.",
+            )}
+          </p>
+          <label className="checkbox">
+            <input
+              type="checkbox"
+              checked={noKey}
+              disabled={!manage || busy}
+              onChange={(e) => {
+                setNoKey(e.target.checked);
+                setKey("");
+              }}
+            />
+            {tx("Este endpoint não exige chave de API")}
+          </label>
+        </>
+      )}
       <label>
         {tx("Modelo")}
         <input
@@ -413,8 +465,8 @@ function ProviderCard({
           value={key}
           onChange={(e) => setKey(e.target.value)}
           maxLength={4096}
-          disabled={!manage || busy}
-          required={!provider.configured}
+          disabled={!manage || busy || (compatible && noKey)}
+          required={!provider.configured && !(compatible && noKey)}
           placeholder={
             provider.configured
               ? tx("Chave salva · deixe vazio para manter")
@@ -434,14 +486,18 @@ function ProviderCard({
           {provider.name}
         </label>
         <a href={provider.docs} target="_blank" rel="noreferrer">
-          {tx("Obter chave")}
+          {tx(compatible ? "Documentação do endpoint" : "Obter chave")}
           <ExternalLink size={12} />
         </a>
       </div>
       {provider.configured && (
         <p className="ai-key-note">
           <KeyRound size={12} />
-          {tx("Chave protegida · Atualizada em")}
+          {tx(
+            compatible && provider.no_key
+              ? "Endpoint sem chave · Atualizado em"
+              : "Chave protegida · Atualizada em",
+          )}
           {stamp(provider.updated_at)}
         </p>
       )}

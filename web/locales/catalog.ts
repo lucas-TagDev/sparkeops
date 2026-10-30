@@ -1,3 +1,4 @@
+import { aiEndpointRows } from "./ai-endpoints.ts";
 import { turnstileRows } from "./turnstile.ts";
 import { settingsRows } from "./settings.ts";
 import { recoveryRows } from "./service-recovery.ts";
@@ -562,7 +563,9 @@ for (const row of (
   "\n" +
   settingsRows +
   "\n" +
-  turnstileRows
+  turnstileRows +
+  "\n" +
+  aiEndpointRows
 )
   .trim()
   .split("\n")) {

@@ -1,3 +1,4 @@
+import { compatibleEndpoint } from "./ai-endpoints.ts";
 import { APIError } from "./store.ts";
 
 export const PROVIDERS = {
@@ -26,9 +27,19 @@ export const PROVIDERS = {
     description: "Modelos do Google",
     docs: "https://aistudio.google.com/apikey",
   },
+  compatible: {
+    name: "API compatível / Local",
+    description: "LM Studio e endpoints compatíveis com OpenAI",
+    docs: "https://lmstudio.ai/docs/developer/openai-compat",
+  },
 } as const;
 export type Provider = keyof typeof PROVIDERS;
-export type Credentials = { provider: Provider; key: string; model: string };
+export type Credentials = {
+  provider: Provider;
+  key: string;
+  model: string;
+  baseUrl?: string;
+};
 export function providerId(value: string): Provider {
   if (!Object.hasOwn(PROVIDERS, value))
     throw new APIError(400, "Provedor de IA inválido.");
@@ -41,7 +52,9 @@ const headers = (c: Credentials): Record<string, string> => ({
     ? { "x-api-key": c.key, "anthropic-version": "2023-06-01" }
     : c.provider === "gemini"
       ? { "x-goog-api-key": c.key }
-      : { Authorization: `Bearer ${c.key}` }),
+      : c.key
+        ? { Authorization: `Bearer ${c.key}` }
+        : {}),
 });
 const hosts = {
   openai: "https://api.openai.com/v1",
@@ -71,13 +84,20 @@ async function request(
 ) {
   let response: Response;
   try {
-    response = await fetcher(hosts[c.provider] + path, {
-      method: body === undefined ? "GET" : "POST",
-      headers: headers(c),
-      body: body === undefined ? undefined : JSON.stringify(body),
-      redirect: "error",
-      signal: AbortSignal.timeout(45000),
-    });
+    response = await fetcher(
+      (c.provider === "compatible"
+        ? compatibleEndpoint(c.baseUrl)
+        : hosts[c.provider]) + path,
+      {
+        method: body === undefined ? "GET" : "POST",
+        headers: headers(c),
+        body: body === undefined ? undefined : JSON.stringify(body),
+        redirect: "error",
+        signal: AbortSignal.timeout(
+          c.provider === "compatible" ? 120000 : 45000,
+        ),
+      },
+    );
   } catch {
     throw new APIError(
       502,
@@ -206,6 +226,8 @@ export async function testProvider(c: Credentials, fetcher = fetch) {
     models: models.filter((id) => typeof id === "string").slice(0, 200),
     message: models.includes(c.model)
       ? "Conexão confirmada. O modelo está listado na sua conta."
-      : "Chave aceita. O modelo informado não apareceu na listagem; confirme o ID e a disponibilidade com o provedor.",
+      : c.provider === "compatible"
+        ? "Endpoint respondeu. O modelo informado não apareceu na listagem; confira o ID e carregue o modelo no servidor."
+        : "Chave aceita. O modelo informado não apareceu na listagem; confirme o ID e a disponibilidade com o provedor.",
   };
 }
