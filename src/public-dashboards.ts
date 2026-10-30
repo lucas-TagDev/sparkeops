@@ -378,6 +378,32 @@ export class PublicDashboards {
             disk: finite(metrics.disk_percent),
           };
         }
+        if (row.kind === "server" && board.show_metrics) {
+          card.metric_history = (
+            this.platform.store.db
+              .prepare(
+                "SELECT received_at,metrics FROM samples WHERE server_id=? AND received_at>=? AND received_at<=? ORDER BY received_at DESC LIMIT 60",
+              )
+              .all(row.id, now() - 3600, now()) as {
+              received_at: number;
+              metrics: string;
+            }[]
+          )
+            .reverse()
+            .map((sample) => {
+              let values: Record<string, unknown> = {};
+              try {
+                const parsed = JSON.parse(sample.metrics);
+                if (parsed && typeof parsed === "object") values = parsed;
+              } catch {}
+              return {
+                at: sample.received_at,
+                cpu: finite(values.cpu_percent),
+                memory: finite(values.memory_percent),
+                disk: finite(values.disk_percent),
+              };
+            });
+        }
         if (row.kind === "url") {
           card.latency_ms = finite(row.latency_ms);
           const stats = this.platform.store.db

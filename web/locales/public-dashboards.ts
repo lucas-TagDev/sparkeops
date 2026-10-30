@@ -64,4 +64,8 @@ Ativar rotação|Enable rotation|Activar rotación
 Novo link gerado. O endereço anterior foi revogado.|New link generated. The previous address has been revoked.|Nuevo enlace generado. La dirección anterior ha sido revocada.
 Painel público excluído.|Public dashboard deleted.|Panel público eliminado.
 Iniciar rotação|Start rotation|Iniciar rotación
+Aguardando hist�rico|Awaiting history|Esperando historial
+Hist�rico de lat�ncia (ms)|Latency history (ms)|Historial de latencia (ms)
+M�n.|Min.|M�n.
+M�x.|Max.|M�x.
 `;

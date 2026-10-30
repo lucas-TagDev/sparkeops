@@ -69,7 +69,11 @@ test("public dashboards: explicit selection, no sensitive data and tenant isolat
     f.a.principal.tenantId,
   ])
     assert.ok(!serialized.includes(hidden));
-  assert.ok(snapshot.items.every((item) => !item.address && !item.metrics));
+  assert.ok(
+    snapshot.items.every(
+      (item) => !item.address && !item.metrics && !item.metric_history,
+    ),
+  );
   assert.throws(() =>
     f.boards.save(f.a.principal, undefined, {
       ...f.config,
@@ -149,6 +153,15 @@ test("public dashboards: explicitly published metrics and sanitized origins", (t
     items.find((i) => i.kind === "url")?.address,
     "https://example.com",
   );
+  const history = items.find((i) => i.kind === "server")!.metric_history!;
+  assert.equal(history.length, 1);
+  assert.deepEqual(Object.keys(history[0]).sort(), [
+    "at",
+    "cpu",
+    "disk",
+    "memory",
+  ]);
+  assert.equal(history[0].cpu, 12);
   assert.ok(!JSON.stringify(items).includes("never public"));
 });
 import { createApp } from "../../src/app.ts";

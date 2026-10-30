@@ -18,6 +18,12 @@ export type PublicDashboardCard = {
   status: "up" | "down" | "pending" | "paused";
   updated_at: number | null;
   metrics?: { cpu: number | null; memory: number | null; disk: number | null };
+  metric_history?: {
+    at: number;
+    cpu: number | null;
+    memory: number | null;
+    disk: number | null;
+  }[];
   address?: string;
   latency_ms?: number | null;
   uptime_percent?: number | null;

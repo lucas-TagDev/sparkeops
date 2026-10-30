@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useId } from "react";
 import {
   Maximize,
   RefreshCw,
@@ -13,6 +13,140 @@ import { t, getLanguage } from "./i18n.ts";
 import { stampSeconds } from "./api.ts";
 import { useBranding } from "./branding.ts";
 import type { PublicDashboardSnapshot } from "../shared/public-dashboards.ts";
+type ChartPoint = { at: number; value: number | null };
+function TrendChart({
+  points,
+  label,
+  color,
+  gap = 7200,
+}: {
+  points: ChartPoint[];
+  label: string;
+  color: string;
+  gap?: number;
+}) {
+  const id = useId().replace(/:/g, "");
+  const valid = points.filter(
+    (p) => p.value != null && Number.isFinite(p.value),
+  );
+  if (!valid.length)
+    return <div className="tv-chart-empty">{t("Aguardando hist�rico")}</div>;
+  const start = points[0].at,
+    end = points[points.length - 1].at,
+    low = Math.min(...valid.map((p) => p.value!)),
+    high = Math.max(...valid.map((p) => p.value!)),
+    pad = Math.max((high - low) * 0.2, high * 0.03, 0.1),
+    min = Math.max(0, low - pad),
+    max = high + pad;
+  const x = (at: number) => 8 + ((at - start) / Math.max(1, end - start)) * 304,
+    y = (value: number) => 76 - ((value - min) / Math.max(0.1, max - min)) * 60;
+  const paths: string[] = [];
+  let path = "",
+    last = 0;
+  for (const point of points) {
+    if (point.value == null || !Number.isFinite(point.value)) {
+      if (path) paths.push(path);
+      path = "";
+      continue;
+    }
+    if (path && point.at - last > gap) {
+      paths.push(path);
+      path = "";
+    }
+    path +=
+      (path ? " L" : "M") +
+      x(point.at).toFixed(2) +
+      "," +
+      y(point.value).toFixed(2);
+    last = point.at;
+  }
+  if (path) paths.push(path);
+  return (
+    <figure className="tv-trend" style={{ color }}>
+      <figcaption>
+        <span>{label}</span>
+        <small>
+          {t("M�n.")}{" "}
+          {low.toLocaleString(getLanguage(), { maximumFractionDigits: 1 })} �{" "}
+          {t("M�x.")}{" "}
+          {high.toLocaleString(getLanguage(), { maximumFractionDigits: 1 })}
+        </small>
+      </figcaption>
+      <svg
+        viewBox="0 0 320 88"
+        preserveAspectRatio="none"
+        role="img"
+        aria-label={label}
+      >
+        <defs>
+          <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="currentColor" stopOpacity=".22" />
+            <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {[16, 46, 76].map((v) => (
+          <path
+            key={v}
+            d={"M8," + v + " H312"}
+            stroke="#334155"
+            strokeDasharray="3 6"
+            fill="none"
+          />
+        ))}
+        {paths.map((d, i) => (
+          <g key={i}>
+            <path
+              d={
+                d +
+                " L" +
+                d.split(" L").at(-1)!.replace(/^M/, "").split(",")[0] +
+                ",84 L" +
+                d.slice(1).split(",")[0] +
+                ",84 Z"
+              }
+              fill={"url(#" + id + ")"}
+            />
+            <path
+              d={d}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.4"
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
+          </g>
+        ))}
+        {valid.map((p, i) => (
+          <circle
+            key={i}
+            cx={x(p.at)}
+            cy={y(p.value!)}
+            r={i === valid.length - 1 ? 3.5 : 2}
+            fill="currentColor"
+          >
+            <title>
+              {stampSeconds(p.at)} � {p.value}
+            </title>
+          </circle>
+        ))}
+      </svg>
+      <div className="tv-chart-times">
+        <span>
+          {new Date(start * 1000).toLocaleTimeString(getLanguage(), {
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
+        </span>
+        <span>
+          {new Date(end * 1000).toLocaleTimeString(getLanguage(), {
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
+        </span>
+      </div>
+    </figure>
+  );
+}
 export function PublicDashboard() {
   const token = new URLSearchParams(location.hash.slice(1)).get("token") ?? "";
   const branding = useBranding();
@@ -213,11 +347,18 @@ export function PublicDashboard() {
                 key={item.key}
               >
                 <div className="tv-card-heading">
-                  {item.kind === "server" ? (
-                    <Server size={24} />
-                  ) : (
-                    <Globe size={24} />
-                  )}
+                  <div
+                    className={
+                      "tv-device-icon " + item.kind + " " + item.status
+                    }
+                  >
+                    {item.kind === "server" ? (
+                      <Server size={24} />
+                    ) : (
+                      <Globe size={24} />
+                    )}
+                    <span className="tv-device-led" />
+                  </div>
                   <div>
                     <h2>{item.name}</h2>
                     {item.address && <small>{item.address}</small>}
@@ -250,6 +391,28 @@ export function PublicDashboard() {
                     ))}
                   </div>
                 )}
+                {item.metric_history && (
+                  <div className="tv-server-charts">
+                    {(
+                      [
+                        ["cpu", "CPU", "#64dfb2"],
+                        ["memory", t("Mem�ria"), "#b6a0ee"],
+                        ["disk", t("Disco"), "#76acfa"],
+                      ] as const
+                    ).map(([key, label, color]) => (
+                      <TrendChart
+                        key={key}
+                        label={label + " (%)"}
+                        color={color}
+                        gap={180}
+                        points={item.metric_history!.map((p) => ({
+                          at: p.at,
+                          value: p[key],
+                        }))}
+                      />
+                    ))}
+                  </div>
+                )}
                 {item.kind === "url" && (
                   <>
                     <div className="tv-url-metrics">
@@ -262,6 +425,14 @@ export function PublicDashboard() {
                         <strong>{number(item.uptime_percent, "%")}</strong>
                       </div>
                     </div>
+                    <TrendChart
+                      label={t("Hist�rico de lat�ncia (ms)")}
+                      color="#64dfb2"
+                      points={(item.history ?? []).map((p) => ({
+                        at: p.at,
+                        value: p.ok ? p.latency_ms : null,
+                      }))}
+                    />
                     <div
                       className="tv-history"
                       aria-label={t("Últimas verificações")}
