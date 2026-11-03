@@ -34,6 +34,7 @@ type Provider = {
 };
 type Settings = {
   can_manage: boolean;
+  instructions: string;
   status: {
     mode: "own" | "platform" | "off";
     provider: string | null;
@@ -51,6 +52,7 @@ export function AISettingsPanel({
   onChanged: () => Promise<void>;
 }) {
   const [settings, setSettings] = useState<Settings | null>(null),
+    [instructions, setInstructions] = useState(""),
     [error, setError] = useState(""),
     [message, setMessage] = useState(""),
     [busy, setBusy] = useState(false),
@@ -59,6 +61,7 @@ export function AISettingsPanel({
   const load = async () => {
     const data = await api<Settings>("/ai/settings");
     setSettings(data);
+    setInstructions(data.instructions);
   };
   useEffect(() => {
     if (allowed) void load().catch((e) => setError(e.message));
@@ -139,6 +142,43 @@ export function AISettingsPanel({
         )}
         {settings && (
           <>
+            <form
+              className="ai-default"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void action(
+                  () => api("/ai/instructions", { instructions }, "PUT"),
+                  tx("Instruções salvas."),
+                );
+              }}
+            >
+              <div style={{ width: "100%" }}>
+                <label htmlFor="workspace-ai-instructions">
+                  {tx("Instruções para a IA")}
+                </label>
+                <p className="muted">
+                  {tx(
+                    "Estas instruções acompanham as conversas e investigações do workspace. A investigação SSH aceita apenas consultas de leitura.",
+                  )}
+                </p>
+                <textarea
+                  id="workspace-ai-instructions"
+                  style={{ width: "100%", resize: "vertical" }}
+                  rows={4}
+                  maxLength={4000}
+                  value={instructions}
+                  onChange={(e) => setInstructions(e.target.value)}
+                  readOnly={!settings.can_manage}
+                />
+                {settings.can_manage && (
+                  <button
+                    disabled={busy || instructions === settings.instructions}
+                  >
+                    {tx("Salvar instruções")}
+                  </button>
+                )}
+              </div>
+            </form>
             <div className="ai-default">
               <div>
                 <h3>{tx("Modo do assistente")}</h3>

@@ -1,3 +1,7 @@
+import {
+  requireDiagnosticCommand,
+  validateDiagnosticWrapper,
+} from "./diagnostic-commands.ts";
 import { createHash, randomUUID } from "node:crypto";
 import ssh2 from "ssh2";
 const { Client } = ssh2;
@@ -443,8 +447,7 @@ export class Operations {
     this.platform.requireRole(p, ["owner", "admin", "operator"]);
     this.platform.server(p, id);
     this.platform.active(p);
-    if (!command.trim() || command.length > 2000 || command.includes("\0"))
-      throw new APIError(400, "Comando inválido.");
+    requireDiagnosticCommand(command);
     const connection = this.credentials(p, id),
       actionId = randomUUID();
     if (
@@ -757,6 +760,12 @@ export class Operations {
         409,
         "Ação expirada, já utilizada ou conexão alterada. Prepare uma nova ação.",
       );
+    if (action.action === "command") {
+      const wrappers = JSON.parse(action.commands);
+      if (!Array.isArray(wrappers) || wrappers.length !== 1)
+        throw new APIError(400, "Comando bloqueado.");
+      validateDiagnosticWrapper(wrappers[0]);
+    }
     const credentials = this.credentials(p, id);
     try {
       const result = this.platform.store.db

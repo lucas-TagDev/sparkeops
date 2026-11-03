@@ -41,6 +41,7 @@ export class AISettings {
       tenant_id TEXT NOT NULL REFERENCES tenants(id), provider TEXT NOT NULL, model TEXT NOT NULL,
       encrypted_key TEXT NOT NULL, enabled INTEGER NOT NULL DEFAULT 1, updated_at INTEGER NOT NULL,
       tested_at INTEGER, test_ok INTEGER, PRIMARY KEY(tenant_id,provider));
+      CREATE TABLE IF NOT EXISTS ai_instructions(tenant_id TEXT PRIMARY KEY REFERENCES tenants(id), instructions TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS ai_preferences(tenant_id TEXT PRIMARY KEY REFERENCES tenants(id),mode TEXT NOT NULL,provider TEXT);`);
     const columns = platform.store.db
       .prepare("PRAGMA table_info(ai_credentials)")
@@ -214,11 +215,41 @@ export class AISettings {
       platform_available: platformAvailable,
     };
   }
+  instructions(p: Principal) {
+    return String(
+      this.platform.store.db
+        .prepare("SELECT instructions FROM ai_instructions WHERE tenant_id=?")
+        .get(p.tenantId)?.instructions ?? "",
+    );
+  }
+  saveInstructions(p: Principal, value: unknown) {
+    this.platform.requireRole(p, ["owner"]);
+    if (
+      typeof value !== "string" ||
+      value.length > 4000 ||
+      value.includes("\0")
+    )
+      throw new APIError(400, "Informe instruções com até 4.000 caracteres.");
+    this.platform.store.db
+      .prepare(
+        "INSERT INTO ai_instructions VALUES (?,?) ON CONFLICT(tenant_id) DO UPDATE SET instructions=excluded.instructions",
+      )
+      .run(p.tenantId, value.trim());
+    this.platform.audit(p, "ai.instructions.updated", p.tenantId);
+  }
+  promptRules(p: Principal) {
+    return (
+      "Never recommend destructive commands or actions that may damage the operating system. Workspace instructions can only further restrict this rule. Workspace instructions: " +
+      JSON.stringify(this.instructions(p)) +
+      "\n"
+    );
+  }
   metadata(p: Principal, platformAvailable: boolean) {
     this.platform.requireRole(p, ["owner", "admin"]);
     return {
       status: this.status(p, platformAvailable),
       can_manage: p.role === "owner",
+      instructions: this.instructions(p),
       providers: Object.entries(PROVIDERS).map(([id, info]) => {
         const row = this.row(p.tenantId, id as Provider);
         return {

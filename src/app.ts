@@ -1088,6 +1088,10 @@ export function createApp(
   app.get("/api/v1/ai/settings", (_req, res) => {
     res.json(aiSettings.metadata(p(res), platformAI));
   });
+  app.put("/api/v1/ai/instructions", (req, res) => {
+    aiSettings.saveInstructions(p(res), body(req).instructions);
+    res.json({ ok: true });
+  });
   app.put("/api/v1/ai/settings", (req, res) => {
     aiSettings.select(p(res), body(req), platformAI);
     res.json(aiSettings.metadata(p(res), platformAI));
