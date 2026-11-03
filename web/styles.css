@@ -6137,3 +6137,16 @@ input[type="datetime-local"] {
     max-width: none;
   }
 }
+
+.assistant-message > div {
+  flex: 1;
+  min-width: 0;
+}
+.assistant-message p,
+.assistant-message pre,
+.user-message {
+  overflow-wrap: anywhere;
+}
+.assistant-message pre {
+  white-space: pre-wrap;
+}

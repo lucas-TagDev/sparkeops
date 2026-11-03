@@ -231,6 +231,14 @@ export async function askAssistant(
         config.fetch,
       );
       answer = result.answer;
+      if (result.truncated)
+        answer +=
+          "\n\n" +
+          (languageOf(p.language) === "pt-BR"
+            ? "Resposta parcial: o modelo atingiu o limite de resposta."
+            : languageOf(p.language) === "es"
+              ? "Respuesta parcial: el modelo alcanzó el límite de respuesta."
+              : "Partial response: the model reached its output limit.");
       platform.store.db
         .prepare(
           "UPDATE ai_usage SET tokens=tokens+? WHERE tenant_id=? AND day=?",

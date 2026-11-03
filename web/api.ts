@@ -16,7 +16,12 @@ export async function api<T = unknown>(
       body: data === undefined ? undefined : JSON.stringify(data),
     },
   );
-  const result = await response.json();
+  const result = await response.json().catch(() => {
+    const message = [502, 503, 504].includes(response.status)
+      ? "O servidor demorou ou está indisponível. Tente novamente."
+      : "O servidor retornou uma resposta inválida.";
+    throw new Error(t(message));
+  });
   if (path === "/me" && response.ok) {
     if (result.user?.language) setLanguage(result.user.language);
     else {

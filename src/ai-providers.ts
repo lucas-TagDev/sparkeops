@@ -82,6 +82,14 @@ async function request(
   body: unknown,
   fetcher: typeof fetch,
 ) {
+  const signal = AbortSignal.timeout(
+    c.provider === "compatible" ? 120000 : 45000,
+  );
+  const timeoutError = () =>
+    new APIError(
+      504,
+      "O provedor de IA excedeu o tempo de espera. Tente novamente.",
+    );
   let response: Response;
   try {
     response = await fetcher(
@@ -93,12 +101,11 @@ async function request(
         headers: headers(c),
         body: body === undefined ? undefined : JSON.stringify(body),
         redirect: "error",
-        signal: AbortSignal.timeout(
-          c.provider === "compatible" ? 120000 : 45000,
-        ),
+        signal,
       },
     );
   } catch {
+    if (signal.aborted) throw timeoutError();
     throw new APIError(
       502,
       "Não foi possível conectar ao provedor de IA. Tente novamente.",
@@ -108,6 +115,7 @@ async function request(
   try {
     return await response.json();
   } catch {
+    if (signal.aborted) throw timeoutError();
     throw new APIError(502, "O provedor retornou uma resposta inválida.");
   }
 }
@@ -200,6 +208,16 @@ export async function generate(
     answer = result.choices?.[0]?.message?.content ?? "";
     tokens = result.usage?.total_tokens ?? 0;
   }
+  const truncated =
+    result.incomplete_details?.reason === "max_output_tokens" ||
+    result.stop_reason === "max_tokens" ||
+    result.candidates?.[0]?.finishReason === "MAX_TOKENS" ||
+    result.choices?.[0]?.finish_reason === "length";
+  if (truncated && (typeof answer !== "string" || !answer.trim()))
+    throw new APIError(
+      502,
+      "O modelo atingiu o limite de resposta antes de gerar texto.",
+    );
   if (typeof answer !== "string" || !answer.trim())
     throw new APIError(
       502,
@@ -207,6 +225,7 @@ export async function generate(
     );
   return {
     answer: answer.slice(0, 30000),
+    ...(truncated ? { truncated: true } : {}),
     tokens: Number.isSafeInteger(tokens) && tokens >= 0 ? tokens : 0,
   };
 }

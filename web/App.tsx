@@ -1937,7 +1937,37 @@ function Assistant({
     org: string;
     server: string;
   } | null>(null);
+  const [analysisRetry, setAnalysisRetry] = useState<string | null>(null);
   const [verificationProgress, setVerificationProgress] = useState("");
+  async function continueAnalysis(sessionId: string) {
+    setError("");
+    setAnalysisRetry(null);
+    try {
+      setVerificationProgress(tx("Analisando a saída do comando…"));
+      const next = await api<{
+        id: string;
+        answer: string;
+        mode: string;
+        created_at: number;
+        session_id: string;
+        action_id: string | null;
+        command: string | null;
+        reason: string;
+      }>(`/assistant/operator/${sessionId}/continue`, {});
+      setMessages((messages) => [
+        ...messages,
+        {
+          ...next,
+          question: tx("Analisar o resultado da investigação"),
+        },
+      ]);
+    } catch (error) {
+      setAnalysisRetry(sessionId);
+      setError((error as Error).message);
+    } finally {
+      setVerificationProgress("");
+    }
+  }
   const [org, setOrg] = useState(
       initialAlert?.organization ?? organizations[0]?.id ?? "",
     ),
@@ -2351,6 +2381,16 @@ function Assistant({
         {error && (
           <div ref={chatErrorRef} className="banner error" role="alert">
             {error}
+            {analysisRetry && messages.at(-1)?.session_id === analysisRetry && (
+              <button
+                type="button"
+                className="secondary"
+                disabled={busy}
+                onClick={() => void run(() => continueAnalysis(analysisRetry))}
+              >
+                {tx("Tentar análise novamente")}
+              </button>
+            )}
           </div>
         )}
         {!messages.length && (
@@ -2499,8 +2539,7 @@ function Assistant({
                       </p>
                     )}
                     <p className="muted">
-                      {tx("Comando proposto para")}
-                      {targetName}
+                      {tx("Comando proposto para")} {targetName}
                       {tx(
                         ". Revise todo o conteúdo: a execução pode ler dados ou alterar o sistema. A IA só receberá a saída após a aprovação.",
                       )}
@@ -2554,31 +2593,8 @@ function Assistant({
                                       "Execução indeterminada. Confira o servidor antes de repetir.",
                                     ),
                                   );
-                                setVerificationProgress(
-                                  tx("Analisando a saída do comando…"),
-                                );
-                                const next = await api<{
-                                  id: string;
-                                  answer: string;
-                                  mode: string;
-                                  created_at: number;
-                                  session_id: string;
-                                  action_id: string | null;
-                                  command: string | null;
-                                  reason: string;
-                                }>(
-                                  `/assistant/operator/${m.session_id}/continue`,
-                                  {},
-                                );
-                                setMessages((messages) => [
-                                  ...messages,
-                                  {
-                                    ...next,
-                                    question: tx(
-                                      "Analisar o resultado da investigação",
-                                    ),
-                                  },
-                                ]);
+                                if (m.session_id)
+                                  await continueAnalysis(m.session_id);
                               } catch (e) {
                                 setError((e as Error).message);
                               } finally {

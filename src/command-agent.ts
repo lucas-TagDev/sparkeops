@@ -72,7 +72,24 @@ export class CommandAgent {
       .run(id, enabled ? 1 : 0, JSON.stringify(conversation));
     return this.step(p, id);
   }
+  private readonly running = new Set<string>();
+
   async step(p: Principal, id: string) {
+    const key = p.userId + ":" + id;
+    if (this.running.has(key))
+      throw new APIError(
+        409,
+        "A análise ainda está em andamento. Aguarde e tente novamente.",
+      );
+    this.running.add(key);
+    try {
+      return await this.analyze(p, id);
+    } finally {
+      this.running.delete(key);
+    }
+  }
+
+  private async analyze(p: Principal, id: string) {
     this.platform.requireRole(p, ["owner", "admin", "operator"]);
     this.platform.active(p);
     const session = this.platform.store.db
@@ -182,6 +199,11 @@ export class CommandAgent {
         .run(p.tenantId, day);
       throw error;
     }
+    if (response.truncated)
+      throw new APIError(
+        502,
+        "O modelo atingiu o limite de resposta durante a análise. Tente novamente.",
+      );
     let parsed;
     try {
       parsed = JSON.parse(
